@@ -1,0 +1,30 @@
+{
+  "arktsVersion_1_0": [
+    {
+      "messageText": "Argument of type 'undefined' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 22,
+        "character": 24
+      }
+    },
+    {
+      "messageText": "Argument of type '(value: string) => void' is not assignable to parameter of type '(value: string | number) => void'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 28,
+        "character": 16
+      }
+    }
+  ],
+  "arktsVersion_1_1": [
+    {
+      "messageText": "Argument of type '(value: string) => void' is not assignable to parameter of type '(value: string | number) => void'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 28,
+        "character": 16
+      }
+    }
+  ]
+}

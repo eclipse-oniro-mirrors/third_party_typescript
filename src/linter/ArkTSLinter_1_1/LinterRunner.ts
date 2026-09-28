@@ -14,7 +14,7 @@
  */
 
 import {
-  ArkTSLinterTimePrinter, arrayFrom, BuilderProgram, Diagnostic, DiagnosticCategory, getBaseFileName,
+  ArkTSLinterTimePrinter, arrayFrom, BuilderProgram, BuilderProgramState, Diagnostic, DiagnosticCategory, getBaseFileName, getStrictFilterMode,
   isOHModules, Map, normalizePath, Path, PerformanceDotting, Program, resolvePath, ReusableBuilderProgramState, ScriptKind, Set, SourceFile,
   TimePhase, WriteFileCallback, MemoryUtils
 } from "../_namespaces/ts";
@@ -47,13 +47,20 @@ buildInfoWriteFile?: WriteFileCallback, arkTSVersion?: string): Diagnostic[] {
   // to be done before re-evaluating program diagnostics through the call
   // 'tscDiagnosticsLinter.doAllGetDiagnostics()' below, as it will update
   // program state, clearing the changedFiles list.
-  let programState = tsBuilderProgram.getState();
+  let programState = tsBuilderProgram.getState() as BuilderProgramState;
   const oldDiagnostics = programState.arktsLinterDiagnosticsPerFile;
   programState.arktsLinterDiagnosticsPerFile = new Map();
 
   const tscDiagnosticsLinter = new TSCCompiledProgram(tsBuilderProgram);
   const program = tscDiagnosticsLinter.getProgram();
   const compilerOptions = program.getCompilerOptions();
+  const strictFilterMode = getStrictFilterMode(compilerOptions);
+  const enableStrictCheckOHModule = configureStrictCheckOHModule(
+    !!compilerOptions.enableStrictCheckOHModule,
+    compilerOptions.disableStrictCheckPaths
+  );
+  const strictFilterModeChanged = (programState.strictFilterMode ?? 'range') !== strictFilterMode;
+  const strictCheckOHModuleChanged = programState.enableStrictCheckOHModule !== enableStrictCheckOHModule;
 
   const timePrinterInstance = ArkTSLinterTimePrinter.getInstance();
   timePrinterInstance.appendTime(TimePhase.INIT);
@@ -71,7 +78,9 @@ buildInfoWriteFile?: WriteFileCallback, arkTSVersion?: string): Diagnostic[] {
     program,
     arkTSVersion,
     compilerOptions.compatibleSdkVersion,
-    compilerOptions.compatibleSdkVersionStage
+    compilerOptions.compatibleSdkVersionStage,
+    strictFilterMode,
+    enableStrictCheckOHModule
   );
   PerformanceDotting.stopAdvanced('collectChangedFilesFromProgramState');
   // Set arkTSVersion info for file .tsbuildinfo.
@@ -81,6 +90,11 @@ buildInfoWriteFile?: WriteFileCallback, arkTSVersion?: string): Diagnostic[] {
   // so that incremental compilation needs to recheck all files when the configuration changes.
   programState.compatibleSdkVersion = compilerOptions.compatibleSdkVersion;
   programState.compatibleSdkVersionStage = compilerOptions.compatibleSdkVersionStage;
+  programState.strictFilterMode = strictFilterMode;
+  programState.enableStrictCheckOHModule = enableStrictCheckOHModule;
+  if (strictFilterModeChanged || strictCheckOHModuleChanged) {
+    programState.buildInfoEmitPending = true;
+  }
 
   let srcFiles: SourceFile[] = [];
   if (!!srcFile) {
@@ -99,10 +113,6 @@ buildInfoWriteFile?: WriteFileCallback, arkTSVersion?: string): Diagnostic[] {
   TypeScriptLinter.initGlobals(compilerOptions);
   InteropTypescriptLinter.initGlobals();
   LibraryTypeCallDiagnosticChecker.instance.rebuildTscDiagnostics(tscStrictDiagnostics, compilerOptions);
-  const enableStrictCheckOHModule = configureStrictCheckOHModule(
-    !!compilerOptions.enableStrictCheckOHModule,
-    compilerOptions.disableStrictCheckPaths
-  );
 
   var lintLoop = function(fileToLint: SourceFile) {
     if (fileToLint.scriptKind !== ScriptKind.ETS && fileToLint.scriptKind !== ScriptKind.TS) {
@@ -130,10 +140,11 @@ buildInfoWriteFile?: WriteFileCallback, arkTSVersion?: string): Diagnostic[] {
 
         // Get list of bad nodes from the current run.
         // When strictCheckerOnly is enabled, we need to merge linter-processed diagnostics with non-linter diagnostics
-        const linterProcessedDiagnostics = tscStrictDiagnostics.get(normalizePath(fileToLint.fileName)) ?? [];
+        const fileName = normalizePath(fileToLint.fileName);
+        const linterProcessedDiagnostics = tscStrictDiagnostics.get(fileName) ?? [];
         if (compilerOptions.strictCheckerOnly) {
           currentDiagnostics = LibraryTypeCallDiagnosticChecker.instance.mergeDiagnostics(
-            normalizePath(fileToLint.fileName),
+            fileName,
             linterProcessedDiagnostics
           );
         } else {
@@ -206,7 +217,9 @@ function collectChangedFilesFromProgramState(
   program: Program,
   arkTSVersion?: string,
   compatibleSdkVersion?: number,
-  compatibleSdkVersionStage?: string
+  compatibleSdkVersionStage?: string,
+  strictFilterMode?: typeof state.strictFilterMode,
+  enableStrictCheckOHModule?: boolean
 ): Set<Path> {
 const changedFiles = new Set<Path>(state.changedFilesSet);
 
@@ -216,7 +229,9 @@ const changedFiles = new Set<Path>(state.changedFilesSet);
   if (
     state.arkTSVersion !== arkTSVersion ||
     state.compatibleSdkVersion !== compatibleSdkVersion ||
-    state.compatibleSdkVersionStage !== compatibleSdkVersionStage
+    state.compatibleSdkVersionStage !== compatibleSdkVersionStage ||
+    (state.strictFilterMode ?? 'range') !== strictFilterMode ||
+    state.enableStrictCheckOHModule !== enableStrictCheckOHModule
   ) {
     return new Set<Path>(arrayFrom(state.fileInfos.keys()));
   }

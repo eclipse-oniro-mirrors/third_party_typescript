@@ -1,0 +1,21 @@
+{
+  "arktsVersion_1_0": [
+    {
+      "messageText": "Argument of type 'undefined' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 43,
+        "character": 22
+      }
+    },
+    {
+      "messageText": "Argument of type 'undefined' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 49,
+        "character": 37
+      }
+    }
+  ],
+  "arktsVersion_1_1": []
+}

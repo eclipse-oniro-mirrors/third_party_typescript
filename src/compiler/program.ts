@@ -3,6 +3,7 @@ import {
     __String,
     addEmitFlags,
     addRange,
+    applyArkTSLibraryCallDiagnosticFilter,
     append,
     arrayFrom,
     arrayIsEqualTo,
@@ -2798,8 +2799,14 @@ export function createProgram(rootNamesOrOptions: readonly string[] | CreateProg
                 checkDiagnostics = filter(checkDiagnostics, d => plainJSErrors.has(d.code));
             }
             // skip ts-expect-error errors in plain JS files, and skip JSDoc errors except in checked JS
-            return getMergedBindAndCheckDiagnostics(sourceFile, includeBindAndCheckDiagnostics && !isPlainJs, bindDiagnostics,
-                filterFlag ? filterDiagnostics(checkDiagnostics) : checkDiagnostics, isCheckJs ? sourceFile.jsDocDiagnostics : undefined);
+            const mergedDiagnostics = getMergedBindAndCheckDiagnostics(
+                sourceFile,
+                includeBindAndCheckDiagnostics && !isPlainJs,
+                bindDiagnostics,
+                filterFlag ? filterDiagnostics(checkDiagnostics) : checkDiagnostics,
+                isCheckJs ? sourceFile.jsDocDiagnostics : undefined,
+            );
+            return isForLinter ? applyArkTSLibraryCallDiagnosticFilter(mergedDiagnostics, options) : mergedDiagnostics;
         });
     }
 

@@ -2,6 +2,8 @@ import * as ts from "./_namespaces/ts";
 import {
     addRange,
     AffectedFileResult,
+    ArkTSLibraryCallFilterCause,
+    ArkTSLibraryCallFilterKind,
     arrayFrom,
     arrayToMap,
     BuilderProgram,
@@ -48,6 +50,8 @@ import {
     getOwnKeys,
     getRelativePathFromDirectory,
     getTsBuildInfoEmitOutputFilePath,
+    getValidLibraryCallFilterCause,
+    getValidLibraryCallFilterKind,
     handleNoEmitOptions,
     isArray,
     isDeclarationFileName,
@@ -77,6 +81,7 @@ import {
     SourceFile,
     sourceFileMayBeEmitted,
     SourceMapEmitResult,
+    StrictFilterMode,
     toPath,
     tryAddToSet,
     WriteFileCallback,
@@ -91,6 +96,8 @@ export interface ReusableDiagnostic extends ReusableDiagnosticRelatedInformation
     source?: string;
     relatedInformation?: ReusableDiagnosticRelatedInformation[];
     skippedOn?: keyof CompilerOptions;
+    arktsLibraryCallFilter?: ArkTSLibraryCallFilterKind;
+    arktsLibraryCallFilterCause?: ArkTSLibraryCallFilterCause;
 }
 
 /** @internal */
@@ -178,6 +185,14 @@ export interface ReusableBuilderProgramState extends BuilderState {
      * Cache the compatibleSdkVersionStage info
      */
     compatibleSdkVersionStage?: string;
+    /**
+     * Cache the strict diagnostic filtering mode.
+     */
+    strictFilterMode?: StrictFilterMode;
+    /**
+     * Cache the effective oh_modules strict-check state used by ArkTS Linter.
+     */
+    enableStrictCheckOHModule?: boolean;
     /**
      * Strict diagnostics to be concatenated with semantic diagnostics
      * @internal
@@ -281,6 +296,8 @@ export interface BuilderProgramState extends BuilderState, ReusableBuilderProgra
      * Cache the compatibleSdkVersionStage info
      */
     compatibleSdkVersionStage?: string;
+    strictFilterMode?: StrictFilterMode;
+    enableStrictCheckOHModule?: boolean;
     /**
      * Strict diagnostics to be concatenated with semantic diagnostics
      * @internal
@@ -311,6 +328,36 @@ function hasSameKeys(map1: ReadonlyCollection<string> | undefined, map2: Readonl
     return map1 === map2 || map1 !== undefined && map2 !== undefined && map1.size === map2.size && !forEachKey(map1, key => !map2.has(key));
 }
 
+function canReuseSemanticDiagnostics(
+    useOldState: boolean | undefined,
+    state: BuilderProgramState,
+    oldState: Readonly<ReusableBuilderProgramState> | undefined,
+    compilerOptions: CompilerOptions,
+    oldCompilerOptions: CompilerOptions | undefined,
+): boolean {
+    if (!useOldState || !oldState?.semanticDiagnosticsPerFile || !state.semanticDiagnosticsPerFile || !oldCompilerOptions) {
+        return false;
+    }
+    return !compilerOptionsAffectSemanticDiagnostics(compilerOptions, oldCompilerOptions) &&
+        (oldState.strictFilterMode ?? ts.getStrictFilterMode(oldCompilerOptions)) === ts.getStrictFilterMode(compilerOptions);
+}
+
+function copyStrictFilterState(
+    state: BuilderProgramState,
+    oldState: Readonly<ReusableBuilderProgramState> | undefined,
+    useOldState: boolean | undefined,
+): void {
+    if (!useOldState) {
+        return;
+    }
+    if (oldState?.strictFilterMode !== undefined) {
+        state.strictFilterMode = oldState.strictFilterMode;
+    }
+    if (oldState?.enableStrictCheckOHModule !== undefined) {
+        state.enableStrictCheckOHModule = oldState.enableStrictCheckOHModule;
+    }
+}
+
 /**
  * Create the state so that we can iterate on changedFiles/affected files
  */
@@ -334,8 +381,7 @@ function createBuilderProgramState(newProgram: Program, getCanonicalFileName: Ge
 
     const useOldState = BuilderState.canReuseOldState(state.referencedMap, oldState);
     const oldCompilerOptions = useOldState ? oldState!.compilerOptions : undefined;
-    const canCopySemanticDiagnostics = useOldState && oldState!.semanticDiagnosticsPerFile && !!state.semanticDiagnosticsPerFile &&
-        !compilerOptionsAffectSemanticDiagnostics(compilerOptions, oldCompilerOptions!);
+    const canCopySemanticDiagnostics = canReuseSemanticDiagnostics(useOldState, state, oldState, compilerOptions, oldCompilerOptions);
     const canCopyConstEnumRelateCache = useOldState && oldState!.constEnumRelatePerFile && !!state.constEnumRelatePerFile;
     // We can only reuse emit signatures (i.e. .d.ts signatures) if the .d.ts file is unchanged,
     // which will eg be depedent on change in options like declarationDir and outDir options are unchanged.
@@ -361,6 +407,7 @@ function createBuilderProgramState(newProgram: Program, getCanonicalFileName: Ge
     state.arkTSVersion = useOldState ? oldState?.arkTSVersion : undefined;
     state.compatibleSdkVersion = useOldState ? oldState?.compatibleSdkVersion : undefined;
     state.compatibleSdkVersionStage = useOldState ? oldState?.compatibleSdkVersionStage : undefined;
+    copyStrictFilterState(state, oldState, useOldState);
 
     // Update changed files and copy semantic diagnostics if we can
     const referencedMap = state.referencedMap;
@@ -451,6 +498,14 @@ function convertToDiagnostics(diagnostics: readonly ReusableDiagnostic[], newPro
         result.reportsDeprecated = diagnostic.reportDeprecated;
         result.source = diagnostic.source;
         result.skippedOn = diagnostic.skippedOn;
+        const filterKind = getValidLibraryCallFilterKind(diagnostic.arktsLibraryCallFilter);
+        if (filterKind !== undefined) {
+            result.arktsLibraryCallFilter = filterKind;
+        }
+        const filterCause = getValidLibraryCallFilterCause(diagnostic.arktsLibraryCallFilterCause);
+        if (filterCause !== undefined) {
+            result.arktsLibraryCallFilterCause = filterCause;
+        }
         const { relatedInformation } = diagnostic;
         result.relatedInformation = relatedInformation ?
             relatedInformation.length ?
@@ -466,10 +521,15 @@ function convertToDiagnostics(diagnostics: readonly ReusableDiagnostic[], newPro
 }
 
 function convertToDiagnosticRelatedInformation(diagnostic: ReusableDiagnosticRelatedInformation, newProgram: Program, toPath: (path: string) => Path): DiagnosticRelatedInformation {
-    const { file } = diagnostic;
+    const {
+        file,
+        arktsLibraryCallFilter: _arktsLibraryCallFilter,
+        arktsLibraryCallFilterCause: _arktsLibraryCallFilterCause,
+        ...diagnosticWithoutFilterKind
+    } = diagnostic as ReusableDiagnostic;
     return {
-        ...diagnostic,
-        file: file ? newProgram.getSourceFileByPath(toPath(file)) : undefined
+        file: file ? newProgram.getSourceFileByPath(toPath(file)) : undefined,
+        ...diagnosticWithoutFilterKind
     };
 }
 
@@ -1036,6 +1096,8 @@ export interface ProgramMultiFileEmitBuildInfo {
     arkTSVersion?: string;
     compatibleSdkVersion?: number;
     compatibleSdkVersionStage?: string;
+    strictFilterMode?: StrictFilterMode;
+    enableStrictCheckOHModule?: boolean;
 }
 
 /** @internal */
@@ -1203,6 +1265,8 @@ function getProgramBuildInfo(state: BuilderProgramState, getCanonicalFileName: G
     const arkTSVersion = state.arkTSVersion;
     const compatibleSdkVersion = state.compatibleSdkVersion;
     const compatibleSdkVersionStage = state.compatibleSdkVersionStage;
+    const strictFilterMode = state.strictFilterMode;
+    const enableStrictCheckOHModule = state.enableStrictCheckOHModule;
 
     const result: ProgramMultiFileEmitBuildInfo = {
         fileNames,
@@ -1220,6 +1284,8 @@ function getProgramBuildInfo(state: BuilderProgramState, getCanonicalFileName: G
         arkTSVersion,
         compatibleSdkVersion,
         compatibleSdkVersionStage,
+        strictFilterMode,
+        enableStrictCheckOHModule,
     };
     if (hasConstEnumRelateInfo) {
         result.constEnumRelateCache = constEnumRelateCache;
@@ -1297,6 +1363,14 @@ function convertToReusableDiagnostics(diagnostics: readonly Diagnostic[], relati
         result.reportDeprecated = diagnostic.reportsDeprecated;
         result.source = diagnostic.source;
         result.skippedOn = diagnostic.skippedOn;
+        const filterKind = getValidLibraryCallFilterKind(diagnostic.arktsLibraryCallFilter);
+        if (filterKind !== undefined) {
+            result.arktsLibraryCallFilter = filterKind;
+        }
+        const filterCause = getValidLibraryCallFilterCause(diagnostic.arktsLibraryCallFilterCause);
+        if (filterCause !== undefined) {
+            result.arktsLibraryCallFilterCause = filterCause;
+        }
         const { relatedInformation } = diagnostic;
         result.relatedInformation = relatedInformation ?
             relatedInformation.length ?
@@ -1308,10 +1382,15 @@ function convertToReusableDiagnostics(diagnostics: readonly Diagnostic[], relati
 }
 
 function convertToReusableDiagnosticRelatedInformation(diagnostic: DiagnosticRelatedInformation, relativeToBuildInfo: (path: string) => string): ReusableDiagnosticRelatedInformation {
-    const { file } = diagnostic;
+    const {
+        file,
+        arktsLibraryCallFilter: _arktsLibraryCallFilter,
+        arktsLibraryCallFilterCause: _arktsLibraryCallFilterCause,
+        ...diagnosticWithoutFilterKind
+    } = diagnostic as Diagnostic;
     return {
-        ...diagnostic,
-        file: file ? relativeToBuildInfo(file.resolvedPath) : undefined
+        file: file ? relativeToBuildInfo(file.resolvedPath) : undefined,
+        ...diagnosticWithoutFilterKind
     };
 }
 
@@ -1878,6 +1957,8 @@ export function createBuilderProgramUsingProgramBuildInfo(program: ProgramBuildI
             arkTSVersion: program.arkTSVersion,
             compatibleSdkVersion: program.compatibleSdkVersion,
             compatibleSdkVersionStage: program.compatibleSdkVersionStage,
+            ...(program.strictFilterMode === undefined ? {} : { strictFilterMode: program.strictFilterMode }),
+            ...(program.enableStrictCheckOHModule === undefined ? {} : { enableStrictCheckOHModule: program.enableStrictCheckOHModule }),
         };
     }
 

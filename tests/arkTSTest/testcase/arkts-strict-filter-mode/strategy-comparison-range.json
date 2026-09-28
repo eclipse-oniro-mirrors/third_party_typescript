@@ -1,0 +1,22 @@
+{
+  "arktsVersion_1_0": [
+    {
+      "messageText": "No overload matches this call.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 19,
+        "character": 1
+      }
+    }
+  ],
+  "arktsVersion_1_1": [
+    {
+      "messageText": "Argument of type 'null' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 29,
+        "character": 27
+      }
+    }
+  ]
+}
