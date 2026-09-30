@@ -1,0 +1,202 @@
+=== tests/cases/compiler/checkCallExpressionParentNullGuard.ts ===
+//
+// Regression test for checkCallExpression node.parent null guard.
+// When a CallExpression without a parent pointer reaches checkCallExpression
+// (e.g. from runArkPack synthetic nodes), the checker should not crash on
+// `node.parent.kind` access. This test exercises both guarded code paths:
+// 1. The assertion function check (node.parent?.kind === ExpressionStatement)
+// 2. The ESSymbolLike / Symbol() check (walkUpParenthesizedExpressions(node.parent))
+
+// --- Path 1: Assertion function as ExpressionStatement ---
+function assertNonNull(value: any): asserts value {
+>assertNonNull : Symbol(assertNonNull, Decl(checkCallExpressionParentNullGuard.ts, 0, 0))
+>value : Symbol(value, Decl(checkCallExpressionParentNullGuard.ts, 9, 23))
+>value : Symbol(value, Decl(checkCallExpressionParentNullGuard.ts, 9, 23))
+
+    if (value === null || value === undefined) {
+>value : Symbol(value, Decl(checkCallExpressionParentNullGuard.ts, 9, 23))
+>value : Symbol(value, Decl(checkCallExpressionParentNullGuard.ts, 9, 23))
+>undefined : Symbol(undefined)
+
+        throw new Error("Expected non-null");
+>Error : Symbol(Error, Decl(lib.es5.d.ts, --, --), Decl(lib.es5.d.ts, --, --))
+    }
+}
+
+function testAssertion(x: string | null): void {
+>testAssertion : Symbol(testAssertion, Decl(checkCallExpressionParentNullGuard.ts, 13, 1))
+>x : Symbol(x, Decl(checkCallExpressionParentNullGuard.ts, 15, 23))
+
+    assertNonNull(x);
+>assertNonNull : Symbol(assertNonNull, Decl(checkCallExpressionParentNullGuard.ts, 0, 0))
+>x : Symbol(x, Decl(checkCallExpressionParentNullGuard.ts, 15, 23))
+
+    x.length;
+>x.length : Symbol(String.length, Decl(lib.es5.d.ts, --, --))
+>x : Symbol(x, Decl(checkCallExpressionParentNullGuard.ts, 15, 23))
+>length : Symbol(String.length, Decl(lib.es5.d.ts, --, --))
+}
+
+// --- Path 2: Symbol() call in const declaration ---
+const sym1 = Symbol();
+>sym1 : Symbol(sym1, Decl(checkCallExpressionParentNullGuard.ts, 21, 5))
+>Symbol : Symbol(Symbol, Decl(lib.es5.d.ts, --, --), Decl(lib.es2015.symbol.d.ts, --, --), Decl(lib.es2015.symbol.wellknown.d.ts, --, --))
+
+const obj1 = { [sym1]: 42 };
+>obj1 : Symbol(obj1, Decl(checkCallExpressionParentNullGuard.ts, 22, 5))
+>[sym1] : Symbol([sym1], Decl(checkCallExpressionParentNullGuard.ts, 22, 14))
+>sym1 : Symbol(sym1, Decl(checkCallExpressionParentNullGuard.ts, 21, 5))
+
+// --- Combined: overload resolution failure with assertion-like calls ---
+// When overload resolution fails, getSignatureApplicabilityError re-checks
+// argument expressions through checkExpressionWithContextualType, which
+// can recursively enter checkCallExpression.
+function overloaded(x: string): void;
+>overloaded : Symbol(overloaded, Decl(checkCallExpressionParentNullGuard.ts, 22, 28), Decl(checkCallExpressionParentNullGuard.ts, 28, 37), Decl(checkCallExpressionParentNullGuard.ts, 29, 37))
+>x : Symbol(x, Decl(checkCallExpressionParentNullGuard.ts, 28, 20))
+
+function overloaded(x: number): void;
+>overloaded : Symbol(overloaded, Decl(checkCallExpressionParentNullGuard.ts, 22, 28), Decl(checkCallExpressionParentNullGuard.ts, 28, 37), Decl(checkCallExpressionParentNullGuard.ts, 29, 37))
+>x : Symbol(x, Decl(checkCallExpressionParentNullGuard.ts, 29, 20))
+
+function overloaded(x: string | number): void {}
+>overloaded : Symbol(overloaded, Decl(checkCallExpressionParentNullGuard.ts, 22, 28), Decl(checkCallExpressionParentNullGuard.ts, 28, 37), Decl(checkCallExpressionParentNullGuard.ts, 29, 37))
+>x : Symbol(x, Decl(checkCallExpressionParentNullGuard.ts, 30, 20))
+
+// Passing a call expression as argument to trigger recursive checkCallExpression
+declare function getVal(): string | number;
+>getVal : Symbol(getVal, Decl(checkCallExpressionParentNullGuard.ts, 30, 48))
+
+overloaded(getVal());
+>overloaded : Symbol(overloaded, Decl(checkCallExpressionParentNullGuard.ts, 22, 28), Decl(checkCallExpressionParentNullGuard.ts, 28, 37), Decl(checkCallExpressionParentNullGuard.ts, 29, 37))
+>getVal : Symbol(getVal, Decl(checkCallExpressionParentNullGuard.ts, 30, 48))
+
+// --- Arg-loop null guard in getSignatureApplicabilityError / getSpreadArgumentType
+// / getEffectiveCallArguments ---
+//
+// The three guards added alongside MR#877 defend `args[i]` against `undefined`
+// when `args` is sparse (synthetic nodes from runArkPack, or half-rebuilt AST
+// during incremental re-check). Well-formed source can never produce a hole,
+// so the cases below only exercise the guarded loops on the success path to
+// prove normal behavior is unchanged. The actual undefined-arg crash must be
+// reproduced with a synthetic CallExpression whose `arguments` array has holes
+// (manual verification: `ts.factory.createCallExpression` with a sparse
+// arguments array, then `checker.getResolvedSignature()` must not throw).
+
+// Multi-argument call: exercises getSignatureApplicabilityError's fixed-arg loop.
+function multiArg(a: string, b: number, c: boolean): void {}
+>multiArg : Symbol(multiArg, Decl(checkCallExpressionParentNullGuard.ts, 34, 21))
+>a : Symbol(a, Decl(checkCallExpressionParentNullGuard.ts, 49, 18))
+>b : Symbol(b, Decl(checkCallExpressionParentNullGuard.ts, 49, 28))
+>c : Symbol(c, Decl(checkCallExpressionParentNullGuard.ts, 49, 39))
+
+multiArg("s", 1, true);
+>multiArg : Symbol(multiArg, Decl(checkCallExpressionParentNullGuard.ts, 34, 21))
+
+// Rest-parameter call: exercises getSpreadArgumentType's rest-arg loop.
+function withRest(head: number, ...rest: string[]): void {}
+>withRest : Symbol(withRest, Decl(checkCallExpressionParentNullGuard.ts, 50, 23))
+>head : Symbol(head, Decl(checkCallExpressionParentNullGuard.ts, 53, 18))
+>rest : Symbol(rest, Decl(checkCallExpressionParentNullGuard.ts, 53, 31))
+
+withRest(0, "a", "b", "c");
+>withRest : Symbol(withRest, Decl(checkCallExpressionParentNullGuard.ts, 50, 23))
+
+// Spread argument: exercises getEffectiveCallArguments' spread-reconstruction loop.
+function spreadInto(head: number, ...rest: string[]): void {}
+>spreadInto : Symbol(spreadInto, Decl(checkCallExpressionParentNullGuard.ts, 54, 27))
+>head : Symbol(head, Decl(checkCallExpressionParentNullGuard.ts, 57, 20))
+>rest : Symbol(rest, Decl(checkCallExpressionParentNullGuard.ts, 57, 33))
+
+const tuple: [string, string] = ["x", "y"];
+>tuple : Symbol(tuple, Decl(checkCallExpressionParentNullGuard.ts, 58, 5))
+
+spreadInto(0, ...tuple);
+>spreadInto : Symbol(spreadInto, Decl(checkCallExpressionParentNullGuard.ts, 54, 27))
+>tuple : Symbol(tuple, Decl(checkCallExpressionParentNullGuard.ts, 58, 5))
+
+// Overload success with multiple args: exercises chooseOverload -> arg loop.
+function pick(x: string, y: number): string;
+>pick : Symbol(pick, Decl(checkCallExpressionParentNullGuard.ts, 59, 24), Decl(checkCallExpressionParentNullGuard.ts, 62, 44), Decl(checkCallExpressionParentNullGuard.ts, 63, 44))
+>x : Symbol(x, Decl(checkCallExpressionParentNullGuard.ts, 62, 14))
+>y : Symbol(y, Decl(checkCallExpressionParentNullGuard.ts, 62, 24))
+
+function pick(x: number, y: string): string;
+>pick : Symbol(pick, Decl(checkCallExpressionParentNullGuard.ts, 59, 24), Decl(checkCallExpressionParentNullGuard.ts, 62, 44), Decl(checkCallExpressionParentNullGuard.ts, 63, 44))
+>x : Symbol(x, Decl(checkCallExpressionParentNullGuard.ts, 63, 14))
+>y : Symbol(y, Decl(checkCallExpressionParentNullGuard.ts, 63, 24))
+
+function pick(x: string | number, y: string | number): string { return String(x) + y; }
+>pick : Symbol(pick, Decl(checkCallExpressionParentNullGuard.ts, 59, 24), Decl(checkCallExpressionParentNullGuard.ts, 62, 44), Decl(checkCallExpressionParentNullGuard.ts, 63, 44))
+>x : Symbol(x, Decl(checkCallExpressionParentNullGuard.ts, 64, 14))
+>y : Symbol(y, Decl(checkCallExpressionParentNullGuard.ts, 64, 33))
+>String : Symbol(String, Decl(lib.es5.d.ts, --, --), Decl(lib.es5.d.ts, --, --), Decl(lib.es5.d.ts, --, --), Decl(lib.es2015.core.d.ts, --, --), Decl(lib.es2015.iterable.d.ts, --, --) ... and 2 more)
+>x : Symbol(x, Decl(checkCallExpressionParentNullGuard.ts, 64, 14))
+>y : Symbol(y, Decl(checkCallExpressionParentNullGuard.ts, 64, 33))
+
+const r1 = pick("a", 1);
+>r1 : Symbol(r1, Decl(checkCallExpressionParentNullGuard.ts, 65, 5))
+>pick : Symbol(pick, Decl(checkCallExpressionParentNullGuard.ts, 59, 24), Decl(checkCallExpressionParentNullGuard.ts, 62, 44), Decl(checkCallExpressionParentNullGuard.ts, 63, 44))
+
+const r2 = pick(1, "a");
+>r2 : Symbol(r2, Decl(checkCallExpressionParentNullGuard.ts, 66, 5))
+>pick : Symbol(pick, Decl(checkCallExpressionParentNullGuard.ts, 59, 24), Decl(checkCallExpressionParentNullGuard.ts, 62, 44), Decl(checkCallExpressionParentNullGuard.ts, 63, 44))
+
+// Generic function call with type inference: exercises inferTypeArguments'
+// arg loop (guarded against sparse args[i].kind).
+function identity<T>(value: T): T { return value; }
+>identity : Symbol(identity, Decl(checkCallExpressionParentNullGuard.ts, 66, 24))
+>T : Symbol(T, Decl(checkCallExpressionParentNullGuard.ts, 70, 18))
+>value : Symbol(value, Decl(checkCallExpressionParentNullGuard.ts, 70, 21))
+>T : Symbol(T, Decl(checkCallExpressionParentNullGuard.ts, 70, 18))
+>T : Symbol(T, Decl(checkCallExpressionParentNullGuard.ts, 70, 18))
+>value : Symbol(value, Decl(checkCallExpressionParentNullGuard.ts, 70, 21))
+
+const r3 = identity("hello");
+>r3 : Symbol(r3, Decl(checkCallExpressionParentNullGuard.ts, 71, 5))
+>identity : Symbol(identity, Decl(checkCallExpressionParentNullGuard.ts, 66, 24))
+
+const r4 = identity(42);
+>r4 : Symbol(r4, Decl(checkCallExpressionParentNullGuard.ts, 72, 5))
+>identity : Symbol(identity, Decl(checkCallExpressionParentNullGuard.ts, 66, 24))
+
+// Generic function with multiple type params inferred from args.
+function pair<A, B>(a: A, b: B): [A, B] { return [a, b]; }
+>pair : Symbol(pair, Decl(checkCallExpressionParentNullGuard.ts, 72, 24))
+>A : Symbol(A, Decl(checkCallExpressionParentNullGuard.ts, 75, 14))
+>B : Symbol(B, Decl(checkCallExpressionParentNullGuard.ts, 75, 16))
+>a : Symbol(a, Decl(checkCallExpressionParentNullGuard.ts, 75, 20))
+>A : Symbol(A, Decl(checkCallExpressionParentNullGuard.ts, 75, 14))
+>b : Symbol(b, Decl(checkCallExpressionParentNullGuard.ts, 75, 25))
+>B : Symbol(B, Decl(checkCallExpressionParentNullGuard.ts, 75, 16))
+>A : Symbol(A, Decl(checkCallExpressionParentNullGuard.ts, 75, 14))
+>B : Symbol(B, Decl(checkCallExpressionParentNullGuard.ts, 75, 16))
+>a : Symbol(a, Decl(checkCallExpressionParentNullGuard.ts, 75, 20))
+>b : Symbol(b, Decl(checkCallExpressionParentNullGuard.ts, 75, 25))
+
+const r5 = pair("s", 1);
+>r5 : Symbol(r5, Decl(checkCallExpressionParentNullGuard.ts, 76, 5))
+>pair : Symbol(pair, Decl(checkCallExpressionParentNullGuard.ts, 72, 24))
+
+const r6 = pair(true, null);
+>r6 : Symbol(r6, Decl(checkCallExpressionParentNullGuard.ts, 77, 5))
+>pair : Symbol(pair, Decl(checkCallExpressionParentNullGuard.ts, 72, 24))
+
+// Generic with rest parameter: exercises both inferTypeArguments' loop and
+// getSignatureApplicabilityError's rest errorNode branch.
+function concatAll<T>(...items: T[]): T[] { return items; }
+>concatAll : Symbol(concatAll, Decl(checkCallExpressionParentNullGuard.ts, 77, 28))
+>T : Symbol(T, Decl(checkCallExpressionParentNullGuard.ts, 81, 19))
+>items : Symbol(items, Decl(checkCallExpressionParentNullGuard.ts, 81, 22))
+>T : Symbol(T, Decl(checkCallExpressionParentNullGuard.ts, 81, 19))
+>T : Symbol(T, Decl(checkCallExpressionParentNullGuard.ts, 81, 19))
+>items : Symbol(items, Decl(checkCallExpressionParentNullGuard.ts, 81, 22))
+
+const r7 = concatAll("a", "b", "c");
+>r7 : Symbol(r7, Decl(checkCallExpressionParentNullGuard.ts, 82, 5))
+>concatAll : Symbol(concatAll, Decl(checkCallExpressionParentNullGuard.ts, 77, 28))
+
+const r8 = concatAll(1, 2, 3, 4);
+>r8 : Symbol(r8, Decl(checkCallExpressionParentNullGuard.ts, 83, 5))
+>concatAll : Symbol(concatAll, Decl(checkCallExpressionParentNullGuard.ts, 77, 28))
+

@@ -1,0 +1,245 @@
+=== tests/cases/compiler/checkCallExpressionParentNullGuard.ts ===
+//
+// Regression test for checkCallExpression node.parent null guard.
+// When a CallExpression without a parent pointer reaches checkCallExpression
+// (e.g. from runArkPack synthetic nodes), the checker should not crash on
+// `node.parent.kind` access. This test exercises both guarded code paths:
+// 1. The assertion function check (node.parent?.kind === ExpressionStatement)
+// 2. The ESSymbolLike / Symbol() check (walkUpParenthesizedExpressions(node.parent))
+
+// --- Path 1: Assertion function as ExpressionStatement ---
+function assertNonNull(value: any): asserts value {
+>assertNonNull : (value: any) => asserts value
+>value : any
+
+    if (value === null || value === undefined) {
+>value === null || value === undefined : boolean
+>value === null : boolean
+>value : any
+>null : null
+>value === undefined : boolean
+>value : any
+>undefined : undefined
+
+        throw new Error("Expected non-null");
+>new Error("Expected non-null") : Error
+>Error : ErrorConstructor
+>"Expected non-null" : "Expected non-null"
+    }
+}
+
+function testAssertion(x: string | null): void {
+>testAssertion : (x: string | null) => void
+>x : string | null
+>null : null
+
+    assertNonNull(x);
+>assertNonNull(x) : void
+>assertNonNull : (value: any) => asserts value
+>x : string | null
+
+    x.length;
+>x.length : number
+>x : string
+>length : number
+}
+
+// --- Path 2: Symbol() call in const declaration ---
+const sym1 = Symbol();
+>sym1 : unique symbol
+>Symbol() : unique symbol
+>Symbol : SymbolConstructor
+
+const obj1 = { [sym1]: 42 };
+>obj1 : { [sym1]: number; }
+>{ [sym1]: 42 } : { [sym1]: number; }
+>[sym1] : number
+>sym1 : unique symbol
+>42 : 42
+
+// --- Combined: overload resolution failure with assertion-like calls ---
+// When overload resolution fails, getSignatureApplicabilityError re-checks
+// argument expressions through checkExpressionWithContextualType, which
+// can recursively enter checkCallExpression.
+function overloaded(x: string): void;
+>overloaded : { (x: string): void; (x: number): void; }
+>x : string
+
+function overloaded(x: number): void;
+>overloaded : { (x: string): void; (x: number): void; }
+>x : number
+
+function overloaded(x: string | number): void {}
+>overloaded : { (x: string): void; (x: number): void; }
+>x : string | number
+
+// Passing a call expression as argument to trigger recursive checkCallExpression
+declare function getVal(): string | number;
+>getVal : () => string | number
+
+overloaded(getVal());
+>overloaded(getVal()) : void
+>overloaded : { (x: string): void; (x: number): void; }
+>getVal() : string | number
+>getVal : () => string | number
+
+// --- Arg-loop null guard in getSignatureApplicabilityError / getSpreadArgumentType
+// / getEffectiveCallArguments ---
+//
+// The three guards added alongside MR#877 defend `args[i]` against `undefined`
+// when `args` is sparse (synthetic nodes from runArkPack, or half-rebuilt AST
+// during incremental re-check). Well-formed source can never produce a hole,
+// so the cases below only exercise the guarded loops on the success path to
+// prove normal behavior is unchanged. The actual undefined-arg crash must be
+// reproduced with a synthetic CallExpression whose `arguments` array has holes
+// (manual verification: `ts.factory.createCallExpression` with a sparse
+// arguments array, then `checker.getResolvedSignature()` must not throw).
+
+// Multi-argument call: exercises getSignatureApplicabilityError's fixed-arg loop.
+function multiArg(a: string, b: number, c: boolean): void {}
+>multiArg : (a: string, b: number, c: boolean) => void
+>a : string
+>b : number
+>c : boolean
+
+multiArg("s", 1, true);
+>multiArg("s", 1, true) : void
+>multiArg : (a: string, b: number, c: boolean) => void
+>"s" : "s"
+>1 : 1
+>true : true
+
+// Rest-parameter call: exercises getSpreadArgumentType's rest-arg loop.
+function withRest(head: number, ...rest: string[]): void {}
+>withRest : (head: number, ...rest: string[]) => void
+>head : number
+>rest : string[]
+
+withRest(0, "a", "b", "c");
+>withRest(0, "a", "b", "c") : void
+>withRest : (head: number, ...rest: string[]) => void
+>0 : 0
+>"a" : "a"
+>"b" : "b"
+>"c" : "c"
+
+// Spread argument: exercises getEffectiveCallArguments' spread-reconstruction loop.
+function spreadInto(head: number, ...rest: string[]): void {}
+>spreadInto : (head: number, ...rest: string[]) => void
+>head : number
+>rest : string[]
+
+const tuple: [string, string] = ["x", "y"];
+>tuple : [string, string]
+>["x", "y"] : [string, string]
+>"x" : "x"
+>"y" : "y"
+
+spreadInto(0, ...tuple);
+>spreadInto(0, ...tuple) : void
+>spreadInto : (head: number, ...rest: string[]) => void
+>0 : 0
+>...tuple : string
+>tuple : [string, string]
+
+// Overload success with multiple args: exercises chooseOverload -> arg loop.
+function pick(x: string, y: number): string;
+>pick : { (x: string, y: number): string; (x: number, y: string): string; }
+>x : string
+>y : number
+
+function pick(x: number, y: string): string;
+>pick : { (x: string, y: number): string; (x: number, y: string): string; }
+>x : number
+>y : string
+
+function pick(x: string | number, y: string | number): string { return String(x) + y; }
+>pick : { (x: string, y: number): string; (x: number, y: string): string; }
+>x : string | number
+>y : string | number
+>String(x) + y : string
+>String(x) : string
+>String : StringConstructor
+>x : string | number
+>y : string | number
+
+const r1 = pick("a", 1);
+>r1 : string
+>pick("a", 1) : string
+>pick : { (x: string, y: number): string; (x: number, y: string): string; }
+>"a" : "a"
+>1 : 1
+
+const r2 = pick(1, "a");
+>r2 : string
+>pick(1, "a") : string
+>pick : { (x: string, y: number): string; (x: number, y: string): string; }
+>1 : 1
+>"a" : "a"
+
+// Generic function call with type inference: exercises inferTypeArguments'
+// arg loop (guarded against sparse args[i].kind).
+function identity<T>(value: T): T { return value; }
+>identity : <T>(value: T) => T
+>value : T
+>value : T
+
+const r3 = identity("hello");
+>r3 : "hello"
+>identity("hello") : "hello"
+>identity : <T>(value: T) => T
+>"hello" : "hello"
+
+const r4 = identity(42);
+>r4 : 42
+>identity(42) : 42
+>identity : <T>(value: T) => T
+>42 : 42
+
+// Generic function with multiple type params inferred from args.
+function pair<A, B>(a: A, b: B): [A, B] { return [a, b]; }
+>pair : <A, B>(a: A, b: B) => [A, B]
+>a : A
+>b : B
+>[a, b] : [A, B]
+>a : A
+>b : B
+
+const r5 = pair("s", 1);
+>r5 : [string, number]
+>pair("s", 1) : [string, number]
+>pair : <A, B>(a: A, b: B) => [A, B]
+>"s" : "s"
+>1 : 1
+
+const r6 = pair(true, null);
+>r6 : [boolean, null]
+>pair(true, null) : [boolean, null]
+>pair : <A, B>(a: A, b: B) => [A, B]
+>true : true
+>null : null
+
+// Generic with rest parameter: exercises both inferTypeArguments' loop and
+// getSignatureApplicabilityError's rest errorNode branch.
+function concatAll<T>(...items: T[]): T[] { return items; }
+>concatAll : <T>(...items: T[]) => T[]
+>items : T[]
+>items : T[]
+
+const r7 = concatAll("a", "b", "c");
+>r7 : string[]
+>concatAll("a", "b", "c") : string[]
+>concatAll : <T>(...items: T[]) => T[]
+>"a" : "a"
+>"b" : "b"
+>"c" : "c"
+
+const r8 = concatAll(1, 2, 3, 4);
+>r8 : number[]
+>concatAll(1, 2, 3, 4) : number[]
+>concatAll : <T>(...items: T[]) => T[]
+>1 : 1
+>2 : 2
+>3 : 3
+>4 : 4
+

@@ -3833,7 +3833,9 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
                 diagnosticMessage = error(errorLocation, Diagnostics.Annotation_0_used_before_its_declaration, declarationName);
             }
             else if (result.flags & SymbolFlags.Class) {
-                diagnosticMessage = error(errorLocation, Diagnostics.Class_0_used_before_its_declaration, declarationName);
+                const isStruct = isStructDeclaration(declaration);
+                const diagnostics = isStruct ? Diagnostics.Struct_0_used_before_its_declaration : Diagnostics.Class_0_used_before_its_declaration;
+                diagnosticMessage = error(errorLocation, diagnostics, declarationName);
             }
             else if (result.flags & SymbolFlags.RegularEnum) {
                 diagnosticMessage = error(errorLocation, Diagnostics.Enum_0_used_before_its_declaration, declarationName);
