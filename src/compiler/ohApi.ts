@@ -346,6 +346,12 @@ export function hasEtsBuildDecoratorNames(decorators: NodeArray<Decorator> | rea
 }
 
 /** @internal */
+export function tryGetNameOfDecorator(decorator: Decorator): string | undefined {
+    const nameExpr = isCallExpression(decorator.expression) ? decorator.expression.expression : decorator.expression;
+    return isIdentifier(nameExpr) ? nameExpr.escapedText.toString() : undefined;
+}
+
+/** @internal */
 export function hasEtsBuilderDecoratorNames(decorators: NodeArray<Decorator> | readonly Decorator[] | undefined, options: CompilerOptions): boolean {
     const names: string[] = [];
     if (!decorators || !decorators.length) {
@@ -356,9 +362,9 @@ export function hasEtsBuilderDecoratorNames(decorators: NodeArray<Decorator> | r
         return false;
     }
     decorators.forEach(decorator => {
-        const nameExpr = decorator.expression;
-        if (isIdentifier(nameExpr) && renderDecorators.includes(nameExpr.escapedText.toString())) {
-            names.push(nameExpr.escapedText.toString());
+        const name = tryGetNameOfDecorator(decorator);
+        if (name !== undefined && renderDecorators.includes(name)) {
+            names.push(name);
         }
     });
     return names.length !== 0;
@@ -392,7 +398,8 @@ export function isTokenInsideBuilder(decorators: NodeArray<Decorator> | readonly
     }
 
     for (const decorator of decorators) {
-        if (isIdentifier(decorator.expression) && renderDecorators.includes((<Identifier>(decorator.expression)).escapedText.toString())) {
+        const name = tryGetNameOfDecorator(decorator);
+        if (name !== undefined && renderDecorators.includes(name)) {
             return true;
         }
     }

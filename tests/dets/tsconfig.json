@@ -2,6 +2,7 @@
   "compileOnSave": false,
   "files": [
     "cases/arkuiGrammarChecker.ets",
+    "cases/builderCallFormDecorator.ets",
     "cases/componentParameterIsObject.ets",
     "cases/customDecorator.ets",
     "cases/decoratorWithParameters.ets",
