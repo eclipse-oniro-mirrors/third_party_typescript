@@ -3567,7 +3567,10 @@
         "category": "Error",
         "code": 2845
     },
-
+    "Struct '{0}' used before its declaration.": {
+        "category": "Error",
+        "code": 2846
+    },
     "Import declaration '{0}' is using private name '{1}'.": {
         "category": "Error",
         "code": 4000
