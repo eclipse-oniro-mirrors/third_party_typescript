@@ -56,6 +56,11 @@ it("arkuiGrammarChecker.ets", () => {
   expect(expectedDeclaration).to.be.equal(actualDeclaration);
 });
 
+it("builderCallFormDecorator.ets", () => {
+  const {actualDeclaration, expectedDeclaration} = getActualAndExpect("builderCallFormDecorator.d.ets");
+  expect(expectedDeclaration).to.be.equal(actualDeclaration);
+});
+
 it('componentParameterIsObject.ets', () => {
   const {actualDeclaration, expectedDeclaration} = getActualAndExpect('componentParameterIsObject.d.ets');
   expect(expectedDeclaration).to.be.equal(actualDeclaration);

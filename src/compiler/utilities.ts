@@ -497,6 +497,7 @@ import {
     trimStringStart,
     TriviaSyntaxKind,
     tryCast,
+    tryGetNameOfDecorator,
     tryRemovePrefix,
     TryStatement,
     TsConfigSourceFile,
@@ -3012,9 +3013,11 @@ export function isInBuildOrPageTransitionContext(node: Node | undefined, compile
         const decorators = getAllDecorators(container);
         if (decoratorNames && decoratorNames.length &&
             (isMethodDeclaration(container) || isFunctionDeclaration(container)) &&
-            decorators && decorators.some(
-                decorator => isIdentifier(decorator.expression) && decoratorNames.includes(getTextOfPropertyName(decorator.expression).toString()))) {
-                    return true;
+            decorators && decorators.some(decorator => {
+                const name = tryGetNameOfDecorator(decorator);
+                return name !== undefined && decoratorNames.includes(name);
+            })) {
+            return true;
         }
 
         container = getContainingFunctionDeclaration(container);
