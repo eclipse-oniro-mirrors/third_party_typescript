@@ -181,6 +181,7 @@ export class TypeScriptLinter {
     private compatibleSdkVersion: number = 12;
     private mixCompile: boolean = false;
     private allowOHMdouleFallback: boolean = true;
+    private useSemanticFilter: boolean = false;
 
   constructor(private sourceFile: SourceFile,
               /* private */ tsProgram: Program,
@@ -195,6 +196,7 @@ export class TypeScriptLinter {
     this.skipArkTSStaticBlocksCheck = false;
     this.mixCompile = !!options.mixCompile;
     this.allowOHMdouleFallback = allowOHMdouleFallback;
+    this.useSemanticFilter = ts.getStrictFilterMode(options) === 'semantic';
     if (options.skipArkTSStaticBlocksCheck) {
       this.skipArkTSStaticBlocksCheck = options.skipArkTSStaticBlocksCheck as boolean;
     }
@@ -2129,7 +2131,12 @@ readonly handlersMap = new Map([
 
 
   private handleLibraryTypeCall(expr: CallExpression | NewExpression): void {
-    if (!expr.arguments || !this.tscStrictDiagnostics || !this.sourceFile) {
+    if (
+      !expr.arguments ||
+      !this.tscStrictDiagnostics ||
+      !this.sourceFile ||
+      this.useSemanticFilter
+    ) {
       return;
     }
 

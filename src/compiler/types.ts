@@ -6700,7 +6700,27 @@ export interface DiagnosticMessageChain {
     code: number;
     next?: DiagnosticMessageChain[];
     filterFlag?: boolean;
+    /** @internal */
+    arktsLibraryCallFilter?: ArkTSLibraryCallFilterKind;
+    /** @internal */
+    arktsLibraryCallFilterCause?: ArkTSLibraryCallFilterCause;
 }
+
+/** @internal */
+export const enum ArkTSLibraryCallFilterKind {
+    Library = 1,
+    OhModulesEts = 2,
+}
+
+/** @internal */
+export const enum ArkTSLibraryCallFilterCause {
+    None = 0,
+    Nullish = 1,
+    Unknown = 2,
+}
+
+/** @internal */
+export type StrictFilterMode = 'range' | 'semantic';
 
 export interface Diagnostic extends DiagnosticRelatedInformation {
     /** May store more in future. For now, this will simply be `true` to indicate when a diagnostic is an unused-identifier diagnostic. */
@@ -6710,6 +6730,8 @@ export interface Diagnostic extends DiagnosticRelatedInformation {
     source?: string;
     relatedInformation?: DiagnosticRelatedInformation[];
     /** @internal */ skippedOn?: keyof CompilerOptions;
+    /** @internal */ arktsLibraryCallFilter?: ArkTSLibraryCallFilterKind;
+    /** @internal */ arktsLibraryCallFilterCause?: ArkTSLibraryCallFilterCause;
 }
 
 export interface DiagnosticRelatedInformation {
@@ -6975,6 +6997,7 @@ export interface CompilerOptions {
     moduleRootPath?: string; // The root path of module, such as har.
     disableSendableCheckRules?: string[]; // sendable rules that needs to disable.
     strictCheckerOnly?: boolean; // Only do strict check for ets files when enabled.
+    enableAccurateNullChecks?: boolean;
     tsImportSoCheck?: boolean; // Enable type checking for .so file imports.
 }
 

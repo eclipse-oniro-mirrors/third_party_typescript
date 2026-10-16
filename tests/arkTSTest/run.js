@@ -79,6 +79,7 @@ function forceUpdateExpected(expect, reality, jsonFile) {
     const realMessageText = typeof (realErrorItem.messageText) === 'string' ? realErrorItem.messageText : realErrorItem.messageText.messageText;
     let data = {
       messageText: realMessageText,
+      category: ts.DiagnosticCategory[realErrorItem.category],
       expectLineAndCharacter: realLine
     };
     updateArray.push(data);
@@ -167,14 +168,32 @@ function runLinter(rootName) {
     checkJs: false
   };
   Object.assign(options, nonStrictCheckParam);
+  // Accurate null-check filtering is introduced for ArkTS 1.1 only.
+  // ArkTS 1.0 keeps the existing range-based filtering behavior.
+  const isStrictFilterModeTest = path.normalize(rootName).split(path.sep).includes('arkts-strict-filter-mode');
+  // Paired comparison files select one strategy while keeping their source text identical.
+  const testFileName = path.basename(rootName);
+  const comparisonMode = testFileName.endsWith('-range.ets') ? 'range' :
+    testFileName.endsWith('-semantic.ets') ? 'semantic' : undefined;
+  options.enableAccurateNullChecks = arktsVersion === '1.1' && isStrictFilterModeTest ?
+    (comparisonMode ?? 'semantic') === 'semantic' : false;
   if (enableBeta2) {
     beta2Param = { compatibleSdkVersionStage: 'beta2'};
     Object.assign(options, beta2Param);
   }
+  const rootFileName = path.join(process.cwd(), rootName);
   builderProgram = ts.createIncrementalProgramForArkTs({
-      rootNames: [path.join(process.cwd(), rootName)],
+      rootNames: [rootFileName],
       options: options,
     });
+
+  // Files ending in -unfiltered.ets are paired controls. They return the ArkTS
+  // checker's diagnostics before either range or semantic Linter filtering.
+  if (path.basename(rootName).endsWith('-unfiltered.ets')) {
+    const program = builderProgram.getProgram();
+    const sourceFile = program.getSourceFile(rootFileName);
+    return sourceFile ? program.getLinterTypeChecker().getDiagnostics(sourceFile) : [];
+  }
 
   let result = arktsVersion === '1.0' ? ts.ArkTSLinter_1_0.runArkTSLinter(builderProgram) : ts.ArkTSLinter_1_1.runArkTSLinter(builderProgram);
   return result;
@@ -233,7 +252,7 @@ function compareResult(expect, reality){
               expectLineAndCharacter = {"line": expectErrorItem.expectLineAndCharacter.line,"character": expectErrorItem.expectLineAndCharacter.character}
               expectMessageText = expectErrorItem.messageText
               if ((expectErrorItem.expectLineAndCharacter.line === realLine.line && expectErrorItem.expectLineAndCharacter.character === realLine.character) &&
-                realMessageText === expectMessageText) {
+                realMessageText === expectMessageText && (expectErrorItem.category === undefined || expectErrorItem.category === realErrorItem.category || expectErrorItem.category === ts.DiagnosticCategory[realErrorItem.category])) {
                 compResult = true
               }
             }
@@ -263,7 +282,7 @@ function compareResult(expect, reality){
               realLine = {"line": line + 1,"character": character + 1}
               realMessageText = typeof (realErrorItem.messageText) === 'string' ? realErrorItem.messageText : realErrorItem.messageText.messageText;
               if ((expectErrorItem.expectLineAndCharacter.line === realLine.line && expectErrorItem.expectLineAndCharacter.character === realLine.character) &&
-                realMessageText === expectMessageText) {
+                realMessageText === expectMessageText && (expectErrorItem.category === undefined || expectErrorItem.category === realErrorItem.category || expectErrorItem.category === ts.DiagnosticCategory[realErrorItem.category])) {
                 compResult = true
               }
             }
@@ -287,7 +306,7 @@ function compareResult(expect, reality){
               const realMessageText = typeof (realErrorItem.messageText) === 'string' ? realErrorItem.messageText : realErrorItem.messageText.messageText;
               let compInfo = null; compResult = false
               if ((expectErrorItem.expectLineAndCharacter.line === realLine.line && expectErrorItem.expectLineAndCharacter.character === realLine.character) &&
-                realMessageText === expectMessageText) {
+                realMessageText === expectMessageText && (expectErrorItem.category === undefined || expectErrorItem.category === realErrorItem.category || expectErrorItem.category === ts.DiagnosticCategory[realErrorItem.category])) {
                 compResult = true
               }else{
                 isPass = false

@@ -137,6 +137,12 @@ export class LibraryTypeCallDiagnosticChecker {
       }
     }
 
+    // Semantic mode consumes checker markers at file level. The legacy message/range
+    // classification below is only used by handleLibraryTypeCall() in range mode.
+    if (ts.getStrictFilterMode(compilerOptions) === 'semantic') {
+      return;
+    }
+
     const diagnosticMessageChainArr: Diagnostic[] = [];
     const strictArr: Diagnostic[] = [];
     tscStrictDiagnostics.forEach((strict) => {

@@ -14,6 +14,7 @@ import {
     AnyImportSyntax,
     AnyValidImportOrReExport,
     arrayFrom,
+    arrayIsEqualTo,
     ArrayLiteralExpression,
     ArrayTypeNode,
     ArrowFunction,
@@ -77,6 +78,7 @@ import {
     createTextSpan,
     createTextSpanFromBounds,
     Debug,
+    defaultDisableStrictCheckPaths,
     Declaration,
     DeclarationName,
     DeclarationWithTypeParameterChildren,
@@ -1797,12 +1799,21 @@ export function createDiagnosticForFileFromMessageChain(sourceFile: SourceFile, 
 
 /** @internal */
 export function createDiagnosticMessageChainFromDiagnostic(diagnostic: DiagnosticRelatedInformation): DiagnosticMessageChain {
-    return typeof diagnostic.messageText === "string" ? {
+    const result = typeof diagnostic.messageText === 'string' ? {
         code: diagnostic.code,
         category: diagnostic.category,
         messageText: diagnostic.messageText,
         next: (diagnostic as DiagnosticMessageChain).next,
     } : diagnostic.messageText;
+    const arktsLibraryCallFilter = (diagnostic as Diagnostic).arktsLibraryCallFilter;
+    if (arktsLibraryCallFilter !== undefined) {
+        result.arktsLibraryCallFilter = arktsLibraryCallFilter;
+    }
+    const arktsLibraryCallFilterCause = (diagnostic as Diagnostic).arktsLibraryCallFilterCause;
+    if (arktsLibraryCallFilterCause !== undefined) {
+        result.arktsLibraryCallFilterCause = arktsLibraryCallFilterCause;
+    }
+    return result;
 }
 
 /** @internal */
@@ -7702,7 +7713,13 @@ export function getUseDefineForClassFields(compilerOptions: CompilerOptions): bo
 
 /** @internal */
 export function compilerOptionsAffectSemanticDiagnostics(newOptions: CompilerOptions, oldOptions: CompilerOptions): boolean {
-    return optionsHaveChanges(oldOptions, newOptions, semanticDiagnosticsOptionDeclarations);
+    return optionsHaveChanges(oldOptions, newOptions, semanticDiagnosticsOptionDeclarations) ||
+        (oldOptions.enableAccurateNullChecks === true) !== (newOptions.enableAccurateNullChecks === true) ||
+        !!oldOptions.enableStrictCheckOHModule !== !!newOptions.enableStrictCheckOHModule ||
+        !arrayIsEqualTo(
+            oldOptions.disableStrictCheckPaths ?? defaultDisableStrictCheckPaths,
+            newOptions.disableStrictCheckPaths ?? defaultDisableStrictCheckPaths,
+        );
 }
 
 /** @internal */

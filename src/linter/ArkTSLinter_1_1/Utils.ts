@@ -15,7 +15,7 @@
 import {
     ArrayLiteralExpression, AsExpression, BinaryExpression, BinaryOperatorToken, CallExpression, canHaveModifiers,
     CatchClause, ClassDeclaration, CommentRange, ComputedPropertyName, ConditionalExpression, ConstructorDeclaration,
-    Declaration, Decorator, Diagnostic, ElementAccessExpression, EntityName, EnumMember, ESMap, Expression,
+    Declaration, Decorator, defaultDisableStrictCheckPaths, Diagnostic, ElementAccessExpression, EntityName, EnumMember, ESMap, Expression,
     ExpressionWithTypeArguments, Extension, flattenDiagnosticMessageText, ForInStatement, FunctionDeclaration,
     FunctionExpression, getAllDecorators, getAnyExtensionFromPath, getBaseFileName, getCombinedNodeFlags, getDecorators,
     getLineAndCharacterOfPosition, getModifiers, getPathComponents, HasDecorators, hasIndexSignature, HasModifiers,
@@ -58,7 +58,7 @@ export const LIMITED_STANDARD_UTILITY_TYPES = [
 
 export const ALLOWED_STD_SYMBOL_API = ["iterator"]
 
-export const ARKTS_IGNORE_DIRS = ['node_modules', 'oh_modules', 'build', '.preview'];
+export const ARKTS_IGNORE_DIRS: string[] = [...defaultDisableStrictCheckPaths];
 export const ARKTS_IGNORE_FILES = ['hvigorfile.ts'];
 
 export const ARKTS_IGNORE_DIRS_OH_MODULES = 'oh_modules';

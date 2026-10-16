@@ -7420,6 +7420,7 @@ declare namespace ts {
         moduleRootPath?: string;
         disableSendableCheckRules?: string[];
         strictCheckerOnly?: boolean;
+        enableAccurateNullChecks?: boolean;
         tsImportSoCheck?: boolean;
     }
     interface EtsOptions {
@@ -13560,6 +13561,7 @@ declare namespace ts {
             private compatibleSdkVersion;
             private mixCompile;
             private allowOHMdouleFallback;
+            private useSemanticFilter;
             constructor(sourceFile: SourceFile, tsProgram: Program, allowOHMdouleFallback?: boolean, tscStrictDiagnostics?: ts.Map<ts.Diagnostic[]> | undefined);
             static clearTsTypeChecker(): void;
             static clearQualifiedNameCache(): void;

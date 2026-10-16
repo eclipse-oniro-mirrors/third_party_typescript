@@ -17,6 +17,8 @@ import {
     AnyImportSyntax,
     append,
     appendIfUnique,
+    ArkTSLibraryCallFilterCause,
+    ArkTSLibraryCallFilterKind,
     ArrayBindingPattern,
     arrayFrom,
     arrayIsHomogeneous,
@@ -1077,7 +1079,9 @@ import {
     THROWS_CATCH,
     THROWS_ASYNC_CALLBACK,
     THROWS_ERROR_CALLBACK,
+    getLibraryCallFilterKind,
     getSdkPath,
+    getStrictFilterMode,
     ohModulesPathPart
 } from "./ohApi";
 
@@ -1087,6 +1091,10 @@ let nextSymbolId = 1;
 let nextNodeId = 1;
 let nextMergeId = 1;
 let nextFlowId = 1;
+
+interface ArkTSLibraryCallFilterContext {
+    cause: ArkTSLibraryCallFilterCause;
+}
 
 const enum IterationUse {
     AllowsSyncIterablesFlag = 1 << 0,
@@ -19213,11 +19221,14 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
         expr: Expression | undefined,
         headMessage: DiagnosticMessage | undefined,
         containingMessageChain: (() => DiagnosticMessageChain | undefined) | undefined,
-        errorOutputContainer: { errors?: Diagnostic[], skipLogging?: boolean } | undefined
+        errorOutputContainer: { errors?: Diagnostic[], skipLogging?: boolean } | undefined,
+        arkTSLibraryCallFilterContext?: ArkTSLibraryCallFilterContext,
     ): boolean {
-        if (isTypeRelatedTo(source, target, relation)) return true;
+        if (!arkTSLibraryCallFilterContext && isTypeRelatedTo(source, target, relation)) {
+            return true;
+        }
         if (!errorNode || !elaborateError(expr, source, target, relation, headMessage, containingMessageChain, errorOutputContainer)) {
-            return checkTypeRelatedTo(source, target, relation, errorNode, headMessage, containingMessageChain, errorOutputContainer);
+            return checkTypeRelatedTo(source, target, relation, errorNode, headMessage, containingMessageChain, errorOutputContainer, arkTSLibraryCallFilterContext);
         }
         return false;
     }
@@ -20091,7 +20102,26 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
         headMessage?: DiagnosticMessage,
         containingMessageChain?: () => DiagnosticMessageChain | undefined,
         errorOutputContainer?: { errors?: Diagnostic[], skipLogging?: boolean },
+        arkTSLibraryCallFilterContext?: ArkTSLibraryCallFilterContext,
     ): boolean {
+
+        if (arkTSLibraryCallFilterContext) {
+            const normalizedSource = getNormalizedType(source, /*writing*/ false);
+            const baseConstraint = normalizedSource.flags & TypeFlags.TypeVariable ?
+                getBaseConstraintOfType(normalizedSource) : undefined;
+            const hasUnknownTopLevelSource = !!(normalizedSource.flags & TypeFlags.Unknown) ||
+                !!(normalizedSource.flags & TypeFlags.TypeVariable) &&
+                    (!baseConstraint || !!(getNormalizedType(baseConstraint, /*writing*/ false).flags & TypeFlags.Unknown));
+
+            // A top-level `unknown`, unconstrained type variable, or type variable
+            // constrained to `unknown` produces diagnostic 2345, which is not
+            // filterable. Preserve the normal relation result at the argument
+            // boundary. Nested `unknown` leaves may still be ignored below because
+            // they are reported through the filterable 2322 relation chain.
+            if (hasUnknownTopLevelSource) {
+                return isTypeRelatedTo(source, target, relation);
+            }
+        }
 
         let errorInfo: DiagnosticMessageChain | undefined;
         let relatedInfo: [DiagnosticRelatedInformation, ...DiagnosticRelatedInformation[]] | undefined;
@@ -20463,6 +20493,19 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
             // side) or the type variable (on the target side).
             const source = getNormalizedType(originalSource, /*writing*/ false);
             let target = getNormalizedType(originalTarget, /*writing*/ true);
+
+            // Semantic library-call filtering needs to know whether *all* relation
+            // failures are caused by nullish/unknown source types. Reuse the normal
+            // structural relation walker, but treat those source leaves as related.
+            // This mode is only used by a diagnostic-only recheck below and never
+            // changes the result of the normal assignability check.
+            if (arkTSLibraryCallFilterContext && source.flags & (TypeFlags.Null | TypeFlags.Undefined | TypeFlags.Unknown)) {
+                if (!isTypeRelatedTo(source, target, relation)) {
+                    arkTSLibraryCallFilterContext.cause |= source.flags & TypeFlags.Unknown ?
+                        ArkTSLibraryCallFilterCause.Unknown : ArkTSLibraryCallFilterCause.Nullish;
+                }
+                return Ternary.True;
+            }
 
             if (source === target) return Ternary.True;
 
@@ -20959,7 +21002,10 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
                 return Ternary.False;
             }
             const id = getRelationKey(source, target, intersectionState, relation, /*ingnoreConstraints*/ false);
-            const entry = relation.get(id);
+            // A result computed while nullish failures are ignored is not a valid
+            // normal relation-cache entry. Conversely, a cached normal failure may
+            // become successful in this diagnostic-only mode.
+            const entry = arkTSLibraryCallFilterContext ? undefined : relation.get(id);
             if (entry !== undefined) {
                 if (reportErrors && entry & RelationComparisonResult.Failed) {
                     // We are elaborating errors and the cached result is an unreported failure. The result will be reported
@@ -21059,8 +21105,10 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
                     if (result === Ternary.True || result === Ternary.Maybe) {
                         // If result is definitely true, record all maybe keys as having succeeded. Also, record Ternary.Maybe
                         // results as having succeeded once we reach depth 0, but never record Ternary.Unknown results.
-                        for (let i = maybeStart; i < maybeCount; i++) {
-                            relation.set(maybeKeys[i], RelationComparisonResult.Succeeded | propagatingVarianceFlags);
+                        if (!arkTSLibraryCallFilterContext) {
+                            for (let i = maybeStart; i < maybeCount; i++) {
+                                relation.set(maybeKeys[i], RelationComparisonResult.Succeeded | propagatingVarianceFlags);
+                            }
                         }
                     }
                     maybeCount = maybeStart;
@@ -21069,7 +21117,9 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
             else {
                 // A false result goes straight into global cache (when something is false under
                 // assumptions it will also be false without assumptions)
-                relation.set(id, RelationComparisonResult.Failed | propagatingVarianceFlags);
+                if (!arkTSLibraryCallFilterContext) {
+                    relation.set(id, RelationComparisonResult.Failed | propagatingVarianceFlags);
+                }
                 maybeCount = maybeStart;
             }
             return result;
@@ -32370,9 +32420,13 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
         checkMode: CheckMode,
         reportErrors: boolean,
         containingMessageChain: (() => DiagnosticMessageChain | undefined) | undefined,
+        arkTSLibraryCallFilterContext?: ArkTSLibraryCallFilterContext,
     ): readonly Diagnostic[] | undefined {
 
         const errorOutputContainer: { errors?: Diagnostic[], skipLogging?: boolean } = { errors: undefined, skipLogging: true };
+        const libraryCallFilterKind = reportErrors &&
+            getStrictFilterMode(compilerOptions) === 'semantic' &&
+            isInEtsFile(node) ? getLibraryCallFilterKind(signature.declaration, compilerOptions) : undefined;
         if (isJsxOpeningLikeElement(node)) {
             if (!checkApplicableSignatureForJsxOpeningLikeElement(node, signature, relation, checkMode, reportErrors, containingMessageChain, errorOutputContainer)) {
                 Debug.assert(!reportErrors || !!errorOutputContainer.errors, "jsx should have errors when reporting errors");
@@ -32389,7 +32443,7 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
             const thisArgumentType = getThisArgumentType(thisArgumentNode);
             const errorNode = reportErrors ? (thisArgumentNode || node) : undefined;
             const headMessage = Diagnostics.The_this_context_of_type_0_is_not_assignable_to_method_s_this_of_type_1;
-            if (!checkTypeRelatedTo(thisArgumentType, thisType, relation, errorNode, headMessage, containingMessageChain, errorOutputContainer)) {
+            if (!checkTypeRelatedTo(thisArgumentType, thisType, relation, errorNode, headMessage, containingMessageChain, errorOutputContainer, arkTSLibraryCallFilterContext)) {
                 Debug.assert(!reportErrors || !!errorOutputContainer.errors, "this parameter should have errors when reporting errors");
                 return errorOutputContainer.errors || emptyArray;
             }
@@ -32409,8 +32463,10 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
                 // we obtain the regular type of any object literal arguments because we may not have inferred complete
                 // parameter types yet and therefore excess property checks may yield false positives (see #17041).
                 const checkArgType = checkMode & CheckMode.SkipContextSensitive ? getRegularTypeOfObjectLiteral(argType) : argType;
-                if (!checkTypeRelatedToAndOptionallyElaborate(checkArgType, paramType, relation, reportErrors ? arg : undefined, arg, headMessage, containingMessageChain, errorOutputContainer)) {
+                const errorCountBeforeRelationCheck = errorOutputContainer.errors?.length || 0;
+                if (!checkTypeRelatedToAndOptionallyElaborate(checkArgType, paramType, relation, reportErrors ? arg : undefined, arg, headMessage, containingMessageChain, errorOutputContainer, arkTSLibraryCallFilterContext)) {
                     Debug.assert(!reportErrors || !!errorOutputContainer.errors, "parameter should have errors when reporting errors");
+                    markLibraryCallDiagnostics(errorCountBeforeRelationCheck);
                     maybeAddMissingAwaitInfo(arg, checkArgType, paramType);
                     return errorOutputContainer.errors || emptyArray;
                 }
@@ -32425,8 +32481,10 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
                 restArgCount === 0 ? node :
                 restArgCount === 1 ? firstRest :
                 firstRest && lastRest ? setTextRangePosEnd(createSyntheticExpression(node, spreadType), firstRest.pos, lastRest.end) : node;
-            if (!checkTypeRelatedTo(spreadType, restType, relation, errorNode, headMessage, /*containingMessageChain*/ undefined, errorOutputContainer)) {
+            const errorCountBeforeRelationCheck = errorOutputContainer.errors?.length || 0;
+            if (!checkTypeRelatedTo(spreadType, restType, relation, errorNode, headMessage, /*containingMessageChain*/ undefined, errorOutputContainer, arkTSLibraryCallFilterContext)) {
                 Debug.assert(!reportErrors || !!errorOutputContainer.errors, "rest parameter should have errors when reporting errors");
+                markLibraryCallDiagnostics(errorCountBeforeRelationCheck);
                 maybeAddMissingAwaitInfo(errorNode, spreadType, restType);
                 return errorOutputContainer.errors || emptyArray;
             }
@@ -32445,6 +32503,86 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
                 }
             }
         }
+
+        function markLibraryCallDiagnostics(firstDiagnosticIndex: number): void {
+            if (!libraryCallFilterKind || !errorOutputContainer.errors) {
+                return;
+            }
+            const filterableDiagnostics = errorOutputContainer.errors
+                .slice(firstDiagnosticIndex);
+            const filterCause = getExclusiveArkTSLibraryCallFilterCause(
+                node,
+                args,
+                signature,
+                relation,
+                checkMode,
+                libraryCallFilterKind,
+            );
+            if (!filterableDiagnostics.length || filterCause === undefined) {
+                return;
+            }
+            for (const diagnostic of filterableDiagnostics) {
+                diagnostic.arktsLibraryCallFilter = libraryCallFilterKind;
+                diagnostic.arktsLibraryCallFilterCause = filterCause;
+            }
+        }
+    }
+
+    function getExclusiveArkTSLibraryCallFilterCause(
+        node: CallLikeExpression,
+        args: readonly Expression[],
+        signature: Signature,
+        relation: ESMap<string, RelationComparisonResult>,
+        checkMode: CheckMode,
+        libraryCallFilterKind: ArkTSLibraryCallFilterKind | undefined,
+    ): ArkTSLibraryCallFilterCause | undefined {
+        if (!libraryCallFilterKind) {
+            return undefined;
+        }
+        const filterContext: ArkTSLibraryCallFilterContext = {
+            cause: ArkTSLibraryCallFilterCause.None,
+        };
+        const isApplicable = getSignatureApplicabilityError(
+            node,
+            args,
+            signature,
+            relation,
+            checkMode,
+            /*reportErrors*/ false,
+            /*containingMessageChain*/ undefined,
+            filterContext,
+        ) === undefined;
+        return isApplicable && filterContext.cause !== ArkTSLibraryCallFilterCause.None ?
+            filterContext.cause : undefined;
+    }
+
+    function getApplicableOverloadLibraryCallFilter(
+        node: CallLikeExpression,
+        args: readonly Expression[],
+        signatures: readonly Signature[],
+        relation: ESMap<string, RelationComparisonResult>,
+        checkMode: CheckMode,
+    ): { kind: ArkTSLibraryCallFilterKind, cause: ArkTSLibraryCallFilterCause } | undefined {
+        if (getStrictFilterMode(compilerOptions) !== 'semantic' || !isInEtsFile(node)) {
+            return undefined;
+        }
+        // A failed overload call is exclusively nullish/unknown when at least one complete
+        // library signature becomes applicable under the relaxed relation.
+        for (const signature of signatures) {
+            const kind = getLibraryCallFilterKind(signature.declaration, compilerOptions);
+            const cause = getExclusiveArkTSLibraryCallFilterCause(
+                node,
+                args,
+                signature,
+                relation,
+                checkMode,
+                kind,
+            );
+            if (kind !== undefined && cause !== undefined) {
+                return { kind, cause };
+            }
+        }
+        return undefined;
     }
 
     /**
@@ -32863,6 +33001,14 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
             if (candidatesForArgumentError) {
                 if (candidatesForArgumentError.length === 1 || candidatesForArgumentError.length > 3) {
                     const last = candidatesForArgumentError[candidatesForArgumentError.length - 1];
+                    const overloadLibraryCallFilter = candidatesForArgumentError.length > 3 ?
+                        getApplicableOverloadLibraryCallFilter(
+                            node,
+                            args,
+                            candidatesForArgumentError,
+                            assignableRelation,
+                            CheckMode.Normal,
+                        ) : undefined;
                     let chain: DiagnosticMessageChain | undefined;
                     if (candidatesForArgumentError.length > 3) {
                         chain = chainDiagnosticMessages(chain, Diagnostics.The_last_overload_gave_the_following_error);
@@ -32873,6 +33019,10 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
                         for (const d of diags) {
                             if (last.declaration && candidatesForArgumentError.length > 3) {
                                 addRelatedInfo(d, createDiagnosticForNode(last.declaration, Diagnostics.The_last_overload_is_declared_here));
+                            }
+                            if (overloadLibraryCallFilter) {
+                                d.arktsLibraryCallFilter = overloadLibraryCallFilter.kind;
+                                d.arktsLibraryCallFilterCause = overloadLibraryCallFilter.cause;
                             }
                             addImplementationSuccessElaboration(last, d);
                             diagnostics.add(d);
@@ -32888,10 +33038,24 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
                     let min = Number.MAX_VALUE;
                     let minIndex = 0;
                     let i = 0;
+                    let overloadLibraryCallFilterKind: ArkTSLibraryCallFilterKind | undefined;
+                    let overloadLibraryCallFilterCause: ArkTSLibraryCallFilterCause | undefined;
                     for (const c of candidatesForArgumentError) {
                         const chain = () => chainDiagnosticMessages(/*details*/ undefined, Diagnostics.Overload_0_of_1_2_gave_the_following_error, i + 1, candidates.length, signatureToString(c));
                         const diags = getSignatureApplicabilityError(node, args, c, assignableRelation, CheckMode.Normal, /*reportErrors*/ true, chain);
                         if (diags) {
+                            // Overload resolution needs only one applicable signature. Keep the first
+                            // complete candidate that succeeds after ignoring the allowed causes.
+                            if (overloadLibraryCallFilterKind === undefined) {
+                                for (const diagnostic of diags) {
+                                    if (diagnostic.arktsLibraryCallFilter !== undefined &&
+                                        diagnostic.arktsLibraryCallFilterCause !== undefined) {
+                                        overloadLibraryCallFilterKind = diagnostic.arktsLibraryCallFilter;
+                                        overloadLibraryCallFilterCause = diagnostic.arktsLibraryCallFilterCause;
+                                        break;
+                                    }
+                                }
+                            }
                             if (diags.length <= min) {
                                 min = diags.length;
                                 minIndex = i;
@@ -32920,6 +33084,10 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
                     }
                     else {
                         diag = createDiagnosticForNodeFromMessageChain(node, chain, related);
+                    }
+                    if (overloadLibraryCallFilterKind !== undefined && overloadLibraryCallFilterCause !== undefined) {
+                        diag.arktsLibraryCallFilter = overloadLibraryCallFilterKind;
+                        diag.arktsLibraryCallFilterCause = overloadLibraryCallFilterCause;
                     }
                     addImplementationSuccessElaboration(candidatesForArgumentError[0], diag);
                     diagnostics.add(diag);

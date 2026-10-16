@@ -1,0 +1,31 @@
+{
+  "arktsVersion_1_0": [
+    {
+      "messageText": "Argument of type 'null' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": { "line": 19, "character": 25 }
+    }
+  ],
+  "arktsVersion_1_1": [
+    {
+      "messageText": "Argument of type 'undefined' is not assignable to parameter of type 'string'.",
+      "category": "Warning",
+      "expectLineAndCharacter": { "line": 18, "character": 25 }
+    },
+    {
+      "messageText": "Argument of type 'null' is not assignable to parameter of type 'string'.",
+      "category": "Warning",
+      "expectLineAndCharacter": { "line": 19, "character": 25 }
+    },
+    {
+      "messageText": "Argument of type 'undefined' is not assignable to parameter of type 'string'.",
+      "category": "Warning",
+      "expectLineAndCharacter": { "line": 21, "character": 28 }
+    },
+    {
+      "messageText": "Argument of type 'null' is not assignable to parameter of type 'string'.",
+      "category": "Warning",
+      "expectLineAndCharacter": { "line": 22, "character": 34 }
+    }
+  ]
+}

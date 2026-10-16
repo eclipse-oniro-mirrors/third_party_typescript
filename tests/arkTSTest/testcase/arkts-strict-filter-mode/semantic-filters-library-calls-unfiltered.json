@@ -1,0 +1,518 @@
+{
+  "arktsVersion_1_0": [
+    {
+      "messageText": "Argument of type 'null' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 39,
+        "character": 14
+      }
+    },
+    {
+      "messageText": "Argument of type 'undefined' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 40,
+        "character": 14
+      }
+    },
+    {
+      "messageText": "No overload matches this call.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 41,
+        "character": 18
+      }
+    },
+    {
+      "messageText": "Type 'null' is not assignable to type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 42,
+        "character": 16
+      }
+    },
+    {
+      "messageText": "Argument of type 'undefined' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 43,
+        "character": 22
+      }
+    },
+    {
+      "messageText": "Type 'unknown' is not assignable to type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 44,
+        "character": 16
+      }
+    },
+    {
+      "messageText": "Argument of type 'null' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 46,
+        "character": 25
+      }
+    },
+    {
+      "messageText": "Argument of type 'undefined' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 47,
+        "character": 28
+      }
+    },
+    {
+      "messageText": "Argument of type 'null' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 48,
+        "character": 31
+      }
+    },
+    {
+      "messageText": "Argument of type 'undefined' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 49,
+        "character": 37
+      }
+    },
+    {
+      "messageText": "Argument of type 'null' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 50,
+        "character": 23
+      }
+    },
+    {
+      "messageText": "Argument of type 'undefined' is not assignable to parameter of type 'string | number'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 51,
+        "character": 22
+      }
+    },
+    {
+      "messageText": "Type 'null' is not assignable to type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 52,
+        "character": 28
+      }
+    },
+    {
+      "messageText": "Type 'undefined' is not assignable to type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 53,
+        "character": 14
+      }
+    },
+    {
+      "messageText": "Argument of type 'OptionalLibraryValue' is not assignable to parameter of type 'LibraryValue'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 55,
+        "character": 14
+      }
+    },
+    {
+      "messageText": "Argument of type 'null' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 57,
+        "character": 19
+      }
+    },
+    {
+      "messageText": "Argument of type 'undefined' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 58,
+        "character": 34
+      }
+    },
+    {
+      "messageText": "Argument of type 'null' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 59,
+        "character": 16
+      }
+    },
+    {
+      "messageText": "No overload matches this call.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 60,
+        "character": 22
+      }
+    },
+    {
+      "messageText": "No overload matches this call.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 61,
+        "character": 21
+      }
+    },
+    {
+      "messageText": "Argument of type 'string | null' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 67,
+        "character": 14
+      }
+    },
+    {
+      "messageText": "Argument of type 'string | null' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 68,
+        "character": 14
+      }
+    },
+    {
+      "messageText": "Argument of type 'null' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 69,
+        "character": 12
+      }
+    },
+    {
+      "messageText": "Argument of type 'string | null' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 70,
+        "character": 12
+      }
+    },
+    {
+      "messageText": "Argument of type 'null' is not assignable to parameter of type 'number'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 71,
+        "character": 20
+      }
+    },
+    {
+      "messageText": "Argument of type 'null' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 72,
+        "character": 20
+      }
+    },
+    {
+      "messageText": "Argument of type 'string | null' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 73,
+        "character": 14
+      }
+    },
+    {
+      "messageText": "Argument of type 'string | null' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 74,
+        "character": 14
+      }
+    },
+    {
+      "messageText": "Argument of type 'string | null' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 75,
+        "character": 14
+      }
+    },
+    {
+      "messageText": "Argument of type 'null' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 78,
+        "character": 26
+      }
+    },
+    {
+      "messageText": "Argument of type 'null' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 79,
+        "character": 24
+      }
+    },
+    {
+      "messageText": "Argument of type 'null' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 80,
+        "character": 22
+      }
+    }
+  ],
+  "arktsVersion_1_1": [
+    {
+      "messageText": "Argument of type 'null' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 39,
+        "character": 14
+      }
+    },
+    {
+      "messageText": "Argument of type 'undefined' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 40,
+        "character": 14
+      }
+    },
+    {
+      "messageText": "No overload matches this call.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 41,
+        "character": 18
+      }
+    },
+    {
+      "messageText": "Type 'null' is not assignable to type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 42,
+        "character": 16
+      }
+    },
+    {
+      "messageText": "Argument of type 'undefined' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 43,
+        "character": 22
+      }
+    },
+    {
+      "messageText": "Type 'unknown' is not assignable to type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 44,
+        "character": 16
+      }
+    },
+    {
+      "messageText": "Argument of type 'null' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 46,
+        "character": 25
+      }
+    },
+    {
+      "messageText": "Argument of type 'undefined' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 47,
+        "character": 28
+      }
+    },
+    {
+      "messageText": "Argument of type 'null' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 48,
+        "character": 31
+      }
+    },
+    {
+      "messageText": "Argument of type 'undefined' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 49,
+        "character": 37
+      }
+    },
+    {
+      "messageText": "Argument of type 'null' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 50,
+        "character": 23
+      }
+    },
+    {
+      "messageText": "Argument of type 'undefined' is not assignable to parameter of type 'string | number'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 51,
+        "character": 22
+      }
+    },
+    {
+      "messageText": "Type 'null' is not assignable to type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 52,
+        "character": 28
+      }
+    },
+    {
+      "messageText": "Type 'undefined' is not assignable to type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 53,
+        "character": 14
+      }
+    },
+    {
+      "messageText": "Argument of type 'OptionalLibraryValue' is not assignable to parameter of type 'LibraryValue'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 55,
+        "character": 14
+      }
+    },
+    {
+      "messageText": "Argument of type 'null' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 57,
+        "character": 19
+      }
+    },
+    {
+      "messageText": "Argument of type 'undefined' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 58,
+        "character": 34
+      }
+    },
+    {
+      "messageText": "Argument of type 'null' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 59,
+        "character": 16
+      }
+    },
+    {
+      "messageText": "No overload matches this call.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 60,
+        "character": 22
+      }
+    },
+    {
+      "messageText": "No overload matches this call.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 61,
+        "character": 21
+      }
+    },
+    {
+      "messageText": "Argument of type 'string | null' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 67,
+        "character": 14
+      }
+    },
+    {
+      "messageText": "Argument of type 'string | null' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 68,
+        "character": 14
+      }
+    },
+    {
+      "messageText": "Argument of type 'null' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 69,
+        "character": 12
+      }
+    },
+    {
+      "messageText": "Argument of type 'string | null' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 70,
+        "character": 12
+      }
+    },
+    {
+      "messageText": "Argument of type 'null' is not assignable to parameter of type 'number'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 71,
+        "character": 20
+      }
+    },
+    {
+      "messageText": "Argument of type 'null' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 72,
+        "character": 20
+      }
+    },
+    {
+      "messageText": "Argument of type 'string | null' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 73,
+        "character": 14
+      }
+    },
+    {
+      "messageText": "Argument of type 'string | null' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 74,
+        "character": 14
+      }
+    },
+    {
+      "messageText": "Argument of type 'string | null' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 75,
+        "character": 14
+      }
+    },
+    {
+      "messageText": "Argument of type 'null' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 78,
+        "character": 26
+      }
+    },
+    {
+      "messageText": "Argument of type 'null' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 79,
+        "character": 24
+      }
+    },
+    {
+      "messageText": "Argument of type 'null' is not assignable to parameter of type 'string'.",
+      "category": "Error",
+      "expectLineAndCharacter": {
+        "line": 80,
+        "character": 22
+      }
+    }
+  ]
+}

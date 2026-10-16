@@ -3,6 +3,8 @@ import {
     Annotation,
     AnnotationDeclaration,
     AnnotationPropertyDeclaration,
+    ArkTSLibraryCallFilterCause,
+    ArkTSLibraryCallFilterKind,
     CallExpression,
     ClassDeclaration,
     CommentDirectiveType,
@@ -12,6 +14,8 @@ import {
     Debug,
     Decorator,
     Diagnostic,
+    DiagnosticCategory,
+    Diagnostics,
     ElementAccessExpression,
     EmitHost,
     EmitTextWriter,
@@ -91,6 +95,7 @@ import {
     ScriptKind,
     some,
     SourceFile,
+    StrictFilterMode,
     sys,
     startsWith,
     Statement,
@@ -117,8 +122,112 @@ export const annotationMagicNamePrefix = "__$$ETS_ANNOTATION$$__";
 const maxFlowDepthDefaultValue: number = 2000;
 
 /** @internal */
+export const defaultDisableStrictCheckPaths: readonly string[] = ['node_modules', 'oh_modules', 'build', '.preview'];
+
+/** @internal */
 export function isInEtsFile(node: Node |undefined): boolean {
     return node !== undefined && getSourceFileOfNode(node)?.scriptKind === ScriptKind.ETS;
+}
+
+/** @internal */
+export function getStrictFilterMode(options: CompilerOptions): StrictFilterMode {
+    return options.enableAccurateNullChecks === true ? 'semantic' : 'range';
+}
+
+/** @internal */
+export function applyArkTSLibraryCallDiagnosticFilter(
+    diagnostics: Diagnostic[],
+    options: CompilerOptions,
+): Diagnostic[] {
+    if (getStrictFilterMode(options) !== 'semantic') {
+        return diagnostics;
+    }
+
+    let changed = false;
+    const result: Diagnostic[] = [];
+    for (const diagnostic of diagnostics) {
+        const filterKind = getValidLibraryCallFilterKind(diagnostic.arktsLibraryCallFilter);
+        const filterCause = getValidLibraryCallFilterCause(diagnostic.arktsLibraryCallFilterCause);
+        if (diagnostic.category === DiagnosticCategory.Warning ||
+            !isLibraryCallFilterDiagnosticCode(diagnostic.code) ||
+            filterKind === undefined || filterCause === undefined) {
+            result.push(diagnostic);
+            continue;
+        }
+
+        changed = true;
+        if (filterKind === ArkTSLibraryCallFilterKind.OhModulesEts &&
+            !isStrictCheckOHModuleEnabled(options) &&
+            filterCause !== ArkTSLibraryCallFilterCause.Unknown) {
+            result.push({ ...diagnostic, category: DiagnosticCategory.Warning });
+        }
+    }
+    return changed ? result : diagnostics;
+}
+
+function isStrictCheckOHModuleEnabled(options: CompilerOptions): boolean {
+    if (options.enableStrictCheckOHModule) {
+        return true;
+    }
+    const disableStrictCheckPaths = options.disableStrictCheckPaths ?? defaultDisableStrictCheckPaths;
+    return disableStrictCheckPaths.indexOf('oh_modules') === -1;
+}
+
+function isLibraryCallFilterDiagnosticCode(code: number): boolean {
+    return code === Diagnostics.Type_0_is_not_assignable_to_type_1.code ||
+        code === Diagnostics.Argument_of_type_0_is_not_assignable_to_parameter_of_type_1.code ||
+        code === Diagnostics.No_overload_matches_this_call.code;
+}
+
+/** @internal */
+export function getValidLibraryCallFilterKind(
+    filterKind: ArkTSLibraryCallFilterKind | undefined,
+): ArkTSLibraryCallFilterKind | undefined {
+    return filterKind === ArkTSLibraryCallFilterKind.Library ||
+        filterKind === ArkTSLibraryCallFilterKind.OhModulesEts ? filterKind : undefined;
+}
+
+/** @internal */
+export function getValidLibraryCallFilterCause(
+    filterCause: ArkTSLibraryCallFilterCause | undefined,
+): ArkTSLibraryCallFilterCause | undefined {
+    return filterCause !== undefined && filterCause > ArkTSLibraryCallFilterCause.None &&
+        !(filterCause & ~(ArkTSLibraryCallFilterCause.Nullish | ArkTSLibraryCallFilterCause.Unknown)) ?
+        filterCause : undefined;
+}
+
+/** @internal */
+export function getLibraryCallFilterKind(
+    declaration: Node | undefined,
+    options?: CompilerOptions,
+): ArkTSLibraryCallFilterKind | undefined {
+    if (!declaration) {
+        return undefined;
+    }
+    const sourceFile = getSourceFileOfNode(declaration);
+    if (!sourceFile) {
+        return undefined;
+    }
+    const fileName = normalizePath(sourceFile.fileName).toLowerCase();
+    const pathWithSeparators = `/${fileName.replace(/^\/+|\/+$/g, '')}/`;
+    const thirdPartyDirectories = options?.disableStrictCheckPaths ?? defaultDisableStrictCheckPaths;
+    const isThirdParty = thirdPartyDirectories.some(
+        directory => !!directory &&
+            !(options?.enableStrictCheckOHModule && directory.toLowerCase() === 'oh_modules') &&
+            pathWithSeparators.indexOf(`/${normalizePath(directory).toLowerCase().replace(/^\/+|\/+$/g, '')}/`) >= 0
+    );
+    const baseName = fileName.slice(fileName.lastIndexOf('/') + 1);
+    if (sourceFile.hasNoDefaultLib && /^lib(?:\..+)?\.d\.ts$/.test(baseName)) {
+        return undefined;
+    }
+    if (sourceFile.scriptKind === ScriptKind.ETS && !isThirdParty) {
+        return undefined;
+    }
+    if (!sourceFile.isDeclarationFile && !isThirdParty && !fileName.endsWith('.ts')) {
+        return undefined;
+    }
+    return pathWithSeparators.indexOf('/oh_modules/') >= 0 && sourceFile.scriptKind === ScriptKind.ETS ?
+        ArkTSLibraryCallFilterKind.OhModulesEts : ArkTSLibraryCallFilterKind.Library;
 }
 /** @internal */
 export function isInEtsFileWithOriginal(node: Node |undefined) {
