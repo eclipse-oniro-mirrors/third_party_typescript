@@ -27658,7 +27658,7 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
             }
 
             getNodeLinks(container).flags |= NodeCheckFlags.CaptureArguments;
-            checkIdentifierJsDoc(node, symbol);
+            checkIdentifierJsDoc(node, symbol, checkMode);
             return getTypeOfSymbol(symbol);
         }
 
@@ -27668,7 +27668,7 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
 
         const localOrExportSymbol = getExportSymbolOfValueSymbolIfExported(symbol);
         const targetSymbol = checkDeprecatedAliasedSymbol(localOrExportSymbol, node);
-        checkIdentifierJsDoc(node, targetSymbol);
+        checkIdentifierJsDoc(node, targetSymbol, checkMode);
         if (isDeprecatedSymbol(targetSymbol) && isUncalledFunctionReference(node, targetSymbol) && targetSymbol.declarations) {
             addDeprecatedSuggestion(node, targetSymbol.declarations, node.escapedText as string);
         }
@@ -40393,8 +40393,11 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
         return isRestParameter(node) ? getRestParameterElementType(typeNode) : typeNode;
     }
 
-    function checkIdentifierJsDoc(node: Identifier, sourceSymbol: Symbol): void {
+    function checkIdentifierJsDoc(node: Identifier, sourceSymbol: Symbol, checkMode?: CheckMode): void {
         if (node.virtual || !jsDocFileCheckInfo.fileNeedCheck || !getJsDocNodeCheckedConfig) {
+            return;
+        }
+        if (checkMode === 128 /* SkipEtsComponentBody */) {
             return;
         }
         if (!sourceSymbol || !sourceSymbol.valueDeclaration) {
@@ -40410,9 +40413,15 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
             return;
         }
 
-        sourceSymbol.declarations?.forEach(declaration => {
-            expressionCheckByJsDoc(declaration, node, sourceFile, checkParam.checkConfig);
-        });
+        let signatureDeclaration: Declaration | undefined;
+        if (sourceSymbol?.declarations && sourceSymbol?.declarations.length > 0) {
+            signatureDeclaration = sourceSymbol?.declarations.length === 1 ? sourceSymbol?.declarations[0] : tryGetSignatureDeclaration(checker, node) ?? sourceSymbol.valueDeclaration;
+        }
+
+        if (signatureDeclaration) {
+            expressionCheckByJsDoc(signatureDeclaration, node, sourceFile, checkParam.checkConfig);
+        }
+ 
     }
 
     function checkAnnotations(decorators: NodeArray<ModifierLike> | undefined): void {
