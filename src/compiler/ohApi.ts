@@ -434,6 +434,9 @@ export function hasEtsStylesDecoratorNames(decorators: NodeArray<Decorator> | re
         const nameExpr = decorator.expression;
         if (isIdentifier(nameExpr) && nameExpr.escapedText.toString() === options.ets?.styles?.decorator) {
             names.push(nameExpr.escapedText.toString());
+        } else if (isCallExpression(nameExpr) && isIdentifier(nameExpr.expression) &&
+            nameExpr.expression.escapedText.toString() === options.ets?.styles?.decorator) {
+            names.push(nameExpr.expression.escapedText.toString());
         }
     });
     return names.length !== 0;
@@ -601,11 +604,12 @@ export function getEtsStylesDecoratorComponentNames(decorators: NodeArray<Decora
     const stylesComponents: __String[] = [];
     const stylesDecorator = compilerOptions.ets?.styles?.decorator ?? "Styles";
     decorators?.forEach(decorator => {
-        if (decorator.kind === SyntaxKind.Decorator && decorator.expression.kind === SyntaxKind.Identifier) {
-            const identifier = <Identifier>decorator.expression;
-            if (identifier.kind === SyntaxKind.Identifier && identifier.escapedText === stylesDecorator) {
-                stylesComponents.push(identifier.escapedText);
-            }
+        if (decorator.kind !== SyntaxKind.Decorator || !decorator.expression) {
+            return;
+        }
+        const componentNodeExpression = isCallExpression(decorator.expression) ? decorator.expression.expression : decorator.expression;
+        if (isIdentifier(componentNodeExpression) && componentNodeExpression.escapedText === stylesDecorator) {
+            stylesComponents.push(componentNodeExpression.escapedText);
         }
     });
     return stylesComponents;

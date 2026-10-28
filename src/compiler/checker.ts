@@ -31165,6 +31165,9 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
                         prop = stylesSymbol;
                     }
                 }
+                if (!prop && isPropertyAccessExpression(node)) {
+                    prop = getEtsVirtualChainSymbol(node, right, getEtsNestContext(node));
+                }
             }
         }
         // In `Foo.Bar.Baz`, 'Foo' is not referenced if 'Bar' is a const enum or a module containing only const enums.
@@ -31236,6 +31239,83 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
 
         return getFlowTypeOfAccessExpression(node, prop, propType, right, checkMode);
     }
+
+    function getEtsStylesOrExtendSymbol(
+        node: PropertyAccessExpression,
+        hostComponentName: __String | undefined,
+        right: Identifier,
+        etsNestContext: EtsNestContext
+    ): Symbol | undefined {
+        const locals = getSourceFileOfNode(node).locals;
+        if (locals?.has(right.escapedText)) {
+            const extraSymbol = locals.get(right.escapedText);
+            const decorators = getAllDecorators(extraSymbol?.valueDeclaration);
+            if (hasEtsStylesDecoratorNames(decorators, compilerOptions)) {
+                return etsNestContext === 'extend' ? undefined : extraSymbol;
+            }
+            if (hostComponentName !== undefined &&
+                getEtsExtendDecoratorsComponentNames(decorators, compilerOptions).some(
+                    extendComponentName => extendComponentName === hostComponentName)) {
+                return (etsNestContext === 'stylesFunction' || etsNestContext === 'stylesMethod') ? undefined : extraSymbol;
+            }
+        }
+        const members = getContainingStruct(node)?.symbol.members;
+        if (members?.has(right.escapedText)) {
+            const stylesSymbol = members.get(right.escapedText);
+            if (hasEtsStylesDecoratorNames(getAllDecorators(stylesSymbol?.valueDeclaration), compilerOptions)) {
+                return stylesSymbol;
+            }
+        }
+        return undefined;
+    }
+
+    function getEtsNestContext(node: Node): EtsNestContext {
+        const containingFunction = getContainingFunction(node);
+        if (!containingFunction) {
+            return 'none';
+        }
+        const decorators = getAllDecorators(containingFunction);
+        if (hasEtsStylesDecoratorNames(decorators, compilerOptions)) {
+            return containingFunction.kind === SyntaxKind.MethodDeclaration ? 'stylesMethod' : 'stylesFunction';
+        }
+        if (getEtsExtendDecoratorsComponentNames(decorators, compilerOptions).length > 0) {
+            return 'extend';
+        }
+        return 'none';
+    }
+
+    function getEtsVirtualChainSymbol(
+        node: PropertyAccessExpression,
+        right: Identifier,
+        etsNestContext: EtsNestContext
+    ): Symbol | undefined {
+        const stylesInstance = compilerOptions.ets?.styles.component?.instance;
+        const extendComponents = compilerOptions.ets?.extend?.components;
+        if (!stylesInstance && !extendComponents?.length) {
+            return undefined;
+        }
+        const virtualComponent = ts.getVirtualEtsComponent(node);
+        if (!virtualComponent || !isIdentifier(virtualComponent.expression)) {
+            return undefined;
+        }
+        const rootName = virtualComponent.expression.escapedText;
+        if (rootName === stylesInstance) {
+            if (etsNestContext !== 'stylesFunction' && etsNestContext !== 'stylesMethod') {
+                return undefined;
+            }
+            return getEtsStylesOrExtendSymbol(node, undefined, right, etsNestContext);
+        }
+        const extendComponent = extendComponents?.find(component => component.instance === rootName);
+        if (!extendComponent) {
+            return undefined;
+        }
+        if (etsNestContext !== 'extend') {
+            return undefined;
+        }
+        return getEtsStylesOrExtendSymbol(node, escapeLeadingUnderscores(extendComponent.name), right, etsNestContext);
+    }
+
+    type EtsNestContext = 'none' | 'stylesFunction' | 'stylesMethod' | 'extend';
 
     function checkConstEnumRelate(node: Node, originalSymbol: Symbol, filter?: (filePath: string) => boolean): void {
         const symbol = resolveSymbol(originalSymbol);
