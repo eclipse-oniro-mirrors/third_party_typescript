@@ -6775,6 +6775,9 @@ namespace Parser {
                                 rootNodeName = rootNodeName.replace("Instance", "");
                                 stateStylesRootNode = rootNodeName;
                                 typeArguments = parseEtsTypeArguments(pos, `${rootNodeName}Attribute`);
+                            } else if (inEtsStylesComponentsContext()) {
+                                rootNodeName = rootNodeName.replace("Instance","");
+                                typeArguments = parseEtsTypeArguments(pos, `${rootNodeName}Attribute`);
                             }
                         }
                     }
