@@ -19,7 +19,8 @@
         { "path": "../typingsInstallerCore" },
         { "path": "../deprecatedCompat" },
         { "path": "../harness" },
-        { "path": "../loggedIO" }
+        { "path": "../loggedIO" },
+        { "path": "../linter" }
     ],
 
     "include": ["**/*"]

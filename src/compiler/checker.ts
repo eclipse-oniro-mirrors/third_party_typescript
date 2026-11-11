@@ -90,6 +90,7 @@ import {
     ConstructorTypeNode,
     ConstructSignatureDeclaration,
     contains,
+    containsPath,
     containsParseError,
     ContextFlags,
     copyEntries,
@@ -5144,7 +5145,13 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
     }
 
     function allowImportSendable(sdkPath: string | undefined, currentSourceFile: SourceFile): boolean {
-        const isInSdkPath = !!(sdkPath && ts.normalizePath(currentSourceFile.fileName).startsWith(sdkPath));
+        const normalizedFileName = normalizePath(currentSourceFile.fileName);
+        const arkuiXRawPath = (typeof process !== "undefined") ? process.env.arkUIXSdkRootPath : undefined;
+        const arkuiXSdkPath = arkuiXRawPath ? normalizePath(resolvePath(arkuiXRawPath, "openharmony/ets")) : undefined;
+        const isInSdkPath = !!(
+            (sdkPath && containsPath(normalizePath(sdkPath), normalizedFileName)) ||
+            (arkuiXSdkPath && containsPath(arkuiXSdkPath, normalizedFileName))
+        );
         // Check the file is a TypeScript file outside of the method
         // currentSourceFile must be a ts file
         return (
@@ -34402,7 +34409,12 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
             return false;
         }
 
-        const isSDKPath = skipSdkPathReg.test(sourceFileNamePath);
+        const arkuiXRawPath = (typeof process !== "undefined") ? process.env.arkUIXSdkRootPath : undefined;
+        const arkuiXSdkPath = arkuiXRawPath ? normalizePath(resolvePath(arkuiXRawPath, "openharmony/ets")) : undefined;
+        const isSDKPath = !!(
+            (skipSdkPath && skipSdkPathReg.test(sourceFileNamePath)) ||
+            (arkuiXSdkPath && containsPath(arkuiXSdkPath, sourceFileNamePath))
+        );
         const tags = getJSDocTags(declaration);
         for (const tag of tags) {
             if (tag.tagName.escapedText === THROWS_TAG && !shouldSkipTag(tag, isSDKPath)) {
@@ -34606,7 +34618,21 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
         }
         const sourceFile = getSourceFileOfNode(declarations[0]);
         const fileName = sourceFile?.fileName;
-        return !!fileName?.startsWith(declarationsPath);
+        if (!fileName) {
+            return false;
+        }
+        const normalizedFileName = normalizePath(fileName);
+        if (containsPath(normalizePath(declarationsPath), normalizedFileName)) {
+            return true;
+        }
+        const arkuiXRawPath = (typeof process !== "undefined") ? process.env.arkUIXSdkRootPath : undefined;
+        if (arkuiXRawPath) {
+            const arkuiXComponentPath = normalizePath(resolvePath(arkuiXRawPath, "openharmony/ets/component"));
+            if (containsPath(arkuiXComponentPath, normalizedFileName)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     function propertyAccessExpressionConditionCheck(node: PropertyAccessExpression) {

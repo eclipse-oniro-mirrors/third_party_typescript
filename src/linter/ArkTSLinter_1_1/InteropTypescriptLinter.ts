@@ -14,7 +14,7 @@
  */
 import * as ts from "../_namespaces/ts";
 import {
-    ArrayLiteralExpression, AsExpression, ClassDeclaration, CommentRange, ExportAssignment, ExportDeclaration,
+    ArrayLiteralExpression, AsExpression, ClassDeclaration, CommentRange, containsPath, ExportAssignment, ExportDeclaration,
     forEachChild, getBaseFileName, getModeForUsageLocation, getResolvedModule, getSourceFileOfNode, HeritageClause,
     Identifier, ImportClause, ImportDeclaration, InterfaceDeclaration, isModuleDeclaration, isNamedExports,
     isNamedImports, isNamespaceImport, isStringLiteralLike, Map, NamedExports, NamedImports, NewExpression, Node,
@@ -308,9 +308,13 @@ export class InteropTypescriptLinter {
   }
 
   private allowInSdkImportSendable(resolvedModule: ResolvedModuleFull): boolean {
-    const resolvedModuleIsInSdk = this.SDK_PATH ?
-      normalizePath(resolvedModule.resolvedFileName).startsWith(this.SDK_PATH) :
-      false;
+    const normalizedResolvedFileName = normalizePath(resolvedModule.resolvedFileName);
+    const arkuiXRawPath = (typeof process !== "undefined") ? process.env.arkUIXSdkRootPath : undefined;
+    const arkuiXSdkPath = arkuiXRawPath ? normalizePath(resolvePath(arkuiXRawPath, "openharmony/ets")) : undefined;
+    const resolvedModuleIsInSdk = !!(
+      (this.SDK_PATH && containsPath(this.SDK_PATH, normalizedResolvedFileName)) ||
+      (arkuiXSdkPath && containsPath(arkuiXSdkPath, normalizedResolvedFileName))
+    );
     return this.isInSdk && resolvedModuleIsInSdk && getBaseFileName(resolvedModule.resolvedFileName).indexOf('sendable') !== -1;
   }
 

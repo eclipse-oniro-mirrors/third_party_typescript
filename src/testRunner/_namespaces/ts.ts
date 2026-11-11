@@ -16,6 +16,8 @@ import * as server from "./ts.server";
 export { server };
 import * as projectSystem from "./ts.projectSystem";
 export { projectSystem };
+import * as ArkTSLinter_1_1 from "../../linter/_namespaces/ts.ArkTSLinter_1_1";
+export { ArkTSLinter_1_1 };
 export * from "../unittests/helpers";
 export * from "../unittests/services/extract/helpers";
 export * from "../unittests/tsbuild/helpers";
