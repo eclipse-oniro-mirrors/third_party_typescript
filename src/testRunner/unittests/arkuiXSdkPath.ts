@@ -326,4 +326,22 @@ function callApi(): void {
         const linterDiag = findLinterSendableDiagnostic(diags);
         assert.isDefined(linterDiag, "Expected Linter to reject sendable target outside ArkUI-X SDK whitelist");
     });
+
+    it("does not exempt host OpenHarmony SDK files when ArkUI-X SDK path is active", () => {
+        process.env.arkUIXSdkRootPath = defaultArkuiXRoot;
+
+        const throwsDiags = runThrowsCheck(
+            "/host/openharmony/ets/api/@ohos.throws401.d.ts",
+            "{ BusinessError } 401 - Parameter error."
+        );
+        const throwsDiag = findThrowsDiagnostic(throwsDiags);
+        assert.isDefined(throwsDiag, "Expected host SDK @throws 401 not to be exempted when ArkUI-X SDK is active");
+
+        const sendableDiags = runSendableImportCheck(
+            "/host/openharmony/ets/api/@ohos.test.d.ts",
+            "/host/openharmony/ets/api/sendable.d.ets"
+        );
+        const forbiddenDiag = findForbiddenSendableDiagnostic(sendableDiags);
+        assert.isDefined(forbiddenDiag, "Expected host SDK .d.ts not to be exempted for sendable import when ArkUI-X SDK is active");
+    });
 });

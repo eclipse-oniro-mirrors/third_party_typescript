@@ -918,7 +918,6 @@ import {
     resolutionExtensionIsTSOrJson,
     ResolvedModuleFull,
     ResolvedType,
-    resolvePath,
     resolveTripleslashReference,
     resolvingEmptyArray,
     RestTypeNode,
@@ -1080,8 +1079,10 @@ import {
     THROWS_CATCH,
     THROWS_ASYNC_CALLBACK,
     THROWS_ERROR_CALLBACK,
+    getActiveSdkPath,
     getLibraryCallFilterKind,
-    getSdkPath,
+    getSdkComponentDeclarationsPath,
+    getSdkRootPathForThrows,
     getStrictFilterMode,
     ohModulesPathPart
 } from "./ohApi";
@@ -1516,8 +1517,7 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
     var typeToStringCache = new WeakMap<Type, string>();
 
     // Get the SDK paths that need to skip the @throws check.
-    const skipSdkPath: string = getSdkPath(compilerOptions)!;
-    const skipSdkPathReg: RegExp = new RegExp(skipSdkPath);
+    const skipSdkPath: string | undefined = getSdkRootPathForThrows(compilerOptions);
 
     // Mark strictVariance flag
     var strictVarianceFlag: boolean = false;
@@ -4957,7 +4957,7 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
         }
 
         // the relative path of sdk
-        const sdkPath = compilerOptions.etsLoaderPath ? resolvePath(compilerOptions.etsLoaderPath, '../..') : undefined;
+        const sdkPath = getActiveSdkPath(compilerOptions);
         if (compilerOptions.needDoArkTsLinter &&
             currentSourceFile && currentSourceFile.scriptKind === ScriptKind.TS &&
             resolvedModule && (resolvedModule.extension === ".ets" || resolvedModule.extension === ".d.ets")) {
@@ -5146,12 +5146,7 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
 
     function allowImportSendable(sdkPath: string | undefined, currentSourceFile: SourceFile): boolean {
         const normalizedFileName = normalizePath(currentSourceFile.fileName);
-        const arkuiXRawPath = (typeof process !== "undefined") ? process.env.arkUIXSdkRootPath : undefined;
-        const arkuiXSdkPath = arkuiXRawPath ? normalizePath(resolvePath(arkuiXRawPath, "openharmony/ets")) : undefined;
-        const isInSdkPath = !!(
-            (sdkPath && containsPath(normalizePath(sdkPath), normalizedFileName)) ||
-            (arkuiXSdkPath && containsPath(arkuiXSdkPath, normalizedFileName))
-        );
+        const isInSdkPath = !!(sdkPath && containsPath(sdkPath, normalizedFileName));
         // Check the file is a TypeScript file outside of the method
         // currentSourceFile must be a ts file
         return (
@@ -34403,18 +34398,13 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
     // Determine whether to validate @throws annotations on function declarations, skipping checks for:
     // Paths containing '/node_modules/', '/oh_modules/', or '/js_util_module/' and only @throws tags marked with '401' in SDK paths.
     function shouldCheckThrows(declaration: SignatureDeclaration): boolean {
-        const sourceFileNamePath = getSourceFileOfNode(declaration).fileName.replace(/\\/g, '/');
+        const sourceFileNamePath = normalizePath(getSourceFileOfNode(declaration).fileName);
         const SKIPPED_PATHS = ['/node_modules/', '/oh_modules/', '/js_util_module/'];
         if (SKIPPED_PATHS.some(path => sourceFileNamePath.includes(path))) {
             return false;
         }
 
-        const arkuiXRawPath = (typeof process !== "undefined") ? process.env.arkUIXSdkRootPath : undefined;
-        const arkuiXSdkPath = arkuiXRawPath ? normalizePath(resolvePath(arkuiXRawPath, "openharmony/ets")) : undefined;
-        const isSDKPath = !!(
-            (skipSdkPath && skipSdkPathReg.test(sourceFileNamePath)) ||
-            (arkuiXSdkPath && containsPath(arkuiXSdkPath, sourceFileNamePath))
-        );
+        const isSDKPath = !!(skipSdkPath && containsPath(skipSdkPath, sourceFileNamePath));
         const tags = getJSDocTags(declaration);
         for (const tag of tags) {
             if (tag.tagName.escapedText === THROWS_TAG && !shouldSkipTag(tag, isSDKPath)) {
@@ -34605,11 +34595,11 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
             return false;
         }
 
-        // we believe node is an system ets component if it's declared in "ets-loader/declarations/" in sdk
-        if (!compilerOptions.etsLoaderPath) {
+        // we believe node is an system ets component if it's declared in SDK component declarations directory
+        const declarationsPath = getSdkComponentDeclarationsPath(compilerOptions);
+        if (!declarationsPath) {
             return false;
         }
-        const declarationsPath = resolvePath(compilerOptions.etsLoaderPath, "declarations");
         const symbol = resolveSymbol(getSymbolAtLocation(node));
         const declarations = symbol?.declarations;
         // Check if it only has one declaration and was declared in sdk
@@ -34621,18 +34611,7 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
         if (!fileName) {
             return false;
         }
-        const normalizedFileName = normalizePath(fileName);
-        if (containsPath(normalizePath(declarationsPath), normalizedFileName)) {
-            return true;
-        }
-        const arkuiXRawPath = (typeof process !== "undefined") ? process.env.arkUIXSdkRootPath : undefined;
-        if (arkuiXRawPath) {
-            const arkuiXComponentPath = normalizePath(resolvePath(arkuiXRawPath, "openharmony/ets/component"));
-            if (containsPath(arkuiXComponentPath, normalizedFileName)) {
-                return true;
-            }
-        }
-        return false;
+        return containsPath(declarationsPath, normalizePath(fileName));
     }
 
     function propertyAccessExpressionConditionCheck(node: PropertyAccessExpression) {

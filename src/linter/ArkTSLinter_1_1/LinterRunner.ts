@@ -14,8 +14,8 @@
  */
 
 import {
-  ArkTSLinterTimePrinter, arrayFrom, BuilderProgram, BuilderProgramState, containsPath, Diagnostic, DiagnosticCategory, getBaseFileName, getStrictFilterMode,
-  isOHModules, Map, normalizePath, Path, PerformanceDotting, Program, resolvePath, ReusableBuilderProgramState, ScriptKind, Set, SourceFile,
+  ArkTSLinterTimePrinter, arrayFrom, BuilderProgram, BuilderProgramState, containsPath, Diagnostic, DiagnosticCategory, getActiveSdkPath, getBaseFileName, getStrictFilterMode,
+  isOHModules, Map, normalizePath, Path, PerformanceDotting, Program, ReusableBuilderProgramState, ScriptKind, Set, SourceFile,
   TimePhase, WriteFileCallback, MemoryUtils
 } from "../_namespaces/ts";
 import { 
@@ -154,15 +154,9 @@ buildInfoWriteFile?: WriteFileCallback, arkTSVersion?: string): Diagnostic[] {
       } else {
         InteropTypescriptLinter.initStatic();
         const isKit = getBaseFileName(fileToLint.fileName).indexOf('@kit.') === 0;
-        const etsLoaderPath = program.getCompilerOptions().etsLoaderPath;
         const normalizedFileName = normalizePath(fileToLint.fileName);
-        const sdkPath = etsLoaderPath ? resolvePath(etsLoaderPath, '../..') : undefined;
-        const arkuiXRawPath = (typeof process !== "undefined") ? process.env.arkUIXSdkRootPath : undefined;
-        const arkuiXSdkPath = arkuiXRawPath ? normalizePath(resolvePath(arkuiXRawPath, "openharmony/ets")) : undefined;
-        const isInSdk = !!(
-          (sdkPath && containsPath(normalizePath(sdkPath), normalizedFileName)) ||
-          (arkuiXSdkPath && containsPath(arkuiXSdkPath, normalizedFileName))
-        );
+        const sdkPath = getActiveSdkPath(program.getCompilerOptions());
+        const isInSdk = !!(sdkPath && containsPath(sdkPath, normalizedFileName));
         const isInOhModules = isOHModules(fileToLint.fileName);
         const tsImportSendableEnable = program.getCompilerOptions().tsImportSendableEnable;
         if (isKit || isInOhModules || (!tsImportSendableEnable && !isInSdk)) {
