@@ -8400,9 +8400,27 @@ export function tryParsePattern(pattern: string): string | Pattern | undefined {
         };
 }
 
+const parsedPatternsCache = new WeakMap<MapLike<string[]>, (string | Pattern)[]>();
+const patternMatchCache = new WeakMap<readonly (string | Pattern)[], Pattern | ESMap<string, string | Pattern | undefined>>();
+const maxCachedPatternMatches = 16_384;
+
 /** @internal */
 export function tryParsePatterns(paths: MapLike<string[]>): (string | Pattern)[] {
-    return mapDefined(getOwnKeys(paths), path => tryParsePattern(path));
+    const cached = parsedPatternsCache.get(paths);
+    if (cached) {
+        return cached;
+    }
+    const patterns = mapDefined(getOwnKeys(paths), path => tryParsePattern(path));
+    // Only reuse rules for hosts that guarantee a stable key set. Public
+    // resolveModuleName callers may edit a mutable paths object between calls.
+    if (Object.isFrozen(paths)) {
+        parsedPatternsCache.set(paths, patterns);
+        const first = patterns[0];
+        // A lone "*" matches every candidate; keep the rule instead of a table of names.
+        const matchAll = patterns.length === 1 && !isString(first) && first.prefix === '' && first.suffix === '' ? first : undefined;
+        patternMatchCache.set(patterns, matchAll ?? new Map<string, string | Pattern | undefined>());
+    }
+    return patterns;
 }
 
 /** @internal */
@@ -8470,6 +8488,35 @@ export const emptyFileSystemEntries: FileSystemEntries = {
  * @internal
  */
 export function matchPatternOrExact(patternOrStrings: readonly (string | Pattern)[], candidate: string): string | Pattern | undefined {
+    const matches = patternMatchCache.get(patternOrStrings);
+    if (!matches) {
+        return matchPatternOrExactUncached(patternOrStrings, candidate);
+    }
+    if ('prefix' in matches) {
+        return matches;
+    }
+    const cached = matches.get(candidate);
+    if (cached !== undefined || matches.has(candidate)) {
+        return cached;
+    }
+    const match = matchPatternOrExactUncached(patternOrStrings, candidate);
+    // Watch can retain the same rules indefinitely. Evict a batch of the oldest
+    // entries on overflow, keeping recent insertions and amortizing the cleanup.
+    if (matches.size >= maxCachedPatternMatches) {
+        const keys = matches.keys();
+        for (let i = 0; i < maxCachedPatternMatches / 2; i++) {
+            const key = keys.next();
+            if (key.done) {
+                break;
+            }
+            matches.delete(key.value);
+        }
+    }
+    matches.set(candidate, match);
+    return match;
+}
+
+function matchPatternOrExactUncached(patternOrStrings: readonly (string | Pattern)[], candidate: string): string | Pattern | undefined {
     const patterns: Pattern[] = [];
     for (const patternOrString of patternOrStrings) {
         if (patternOrString === candidate) {
