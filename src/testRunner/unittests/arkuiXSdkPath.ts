@@ -376,4 +376,37 @@ function callApi(): void {
         );
         assert.isUndefined(findThrowsDiagnostic(hostThrowsDiags), "Expected host OpenHarmony SDK path to be exempted when isCrossplatform is false");
     });
+
+    it("supports OpenHarmony CI SDK layout without openharmony intermediate directory for sendable import", () => {
+        process.env.isCrossplatform = "false";
+        const ciEtsLoaderPath = "/out/sdk/packages/ohos-sdk/linux/26.1.0/ets/build-tools/ets-loader";
+        const files: Record<string, VirtualFileEntry> = {
+            "/out/sdk/packages/ohos-sdk/linux/26.1.0/ets/api/@ohos.arkui.StateManagement.d.ts": {
+                content: 'import { State } from "./sendable";\nexport declare const s: State;\n',
+                scriptKind: ts.ScriptKind.TS
+            },
+            "/out/sdk/packages/ohos-sdk/linux/26.1.0/ets/api/sendable.d.ets": {
+                content: "export declare class State {}\n",
+                scriptKind: ts.ScriptKind.ETS
+            }
+        };
+        const resolvedModules: Record<string, ts.ResolvedModuleFull> = {
+            "./sendable": {
+                resolvedFileName: "/out/sdk/packages/ohos-sdk/linux/26.1.0/ets/api/sendable.d.ets",
+                extension: ts.Extension.Dets,
+                isExternalLibraryImport: false
+            }
+        };
+        const options: ts.CompilerOptions = {
+            target: ts.ScriptTarget.ES2021,
+            module: ts.ModuleKind.ESNext,
+            needDoArkTsLinter: true,
+            etsLoaderPath: ciEtsLoaderPath
+        };
+        const program = ts.createProgram(Object.keys(files), options, createVirtualHost(files, resolvedModules));
+        const diags = program.getSemanticDiagnostics(
+            program.getSourceFile("/out/sdk/packages/ohos-sdk/linux/26.1.0/ets/api/@ohos.arkui.StateManagement.d.ts")
+        );
+        assert.isUndefined(findForbiddenSendableDiagnostic(diags), "Expected CI ohos-sdk layout without openharmony/ subdir to allow SDK sendable import");
+    });
 });

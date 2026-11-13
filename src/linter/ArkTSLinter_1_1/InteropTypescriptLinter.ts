@@ -18,7 +18,7 @@ import {
     forEachChild, getBaseFileName, getCurrentSdkPath, getModeForUsageLocation, getResolvedModule, getSourceFileOfNode, HeritageClause,
     Identifier, ImportClause, ImportDeclaration, InterfaceDeclaration, isModuleDeclaration, isNamedExports,
     isNamedImports, isNamespaceImport, isStringLiteralLike, Map, NamedExports, NamedImports, NewExpression, Node,
-    normalizePath, ObjectLiteralExpression, Program, ResolvedModuleFull, resolvePath, SourceFile, SyntaxKind,
+    normalizePath, ObjectLiteralExpression, Program, ResolvedModuleFull, SourceFile, SyntaxKind,
     TypeChecker, perfLogger as Logger
 } from "../_namespaces/ts";
 import { 
@@ -93,8 +93,7 @@ export class InteropTypescriptLinter {
     InteropTypescriptLinter.etsLoaderPath = tsProgram.getCompilerOptions().etsLoaderPath;
     this.currentErrorLine = 0;
     this.currentWarningLine = 0;
-    const sdkRootPath = getCurrentSdkPath(tsProgram.getCompilerOptions());
-    this.SDK_PATH = sdkRootPath ? normalizePath(resolvePath(sdkRootPath, 'openharmony/ets')) : undefined;
+    this.SDK_PATH = getCurrentSdkPath(tsProgram.getCompilerOptions());
   }
 
   public static clearTsTypeChecker(): void {
