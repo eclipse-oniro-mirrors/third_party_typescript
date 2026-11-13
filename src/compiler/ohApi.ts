@@ -1382,46 +1382,17 @@ export function getSdkPath(compilerOptions: CompilerOptions): string | undefined
     return compilerOptions.etsLoaderPath ? resolvePath(compilerOptions.etsLoaderPath, '../../../..') : undefined;
 }
 
-function getArkUIXSdkPath(): string | undefined {
+/**
+ * Returns the SDK root directory for the current project (ArkUI-X SDK or OpenHarmony SDK).
+ * @internal
+ */
+export function getCurrentSdkPath(compilerOptions: CompilerOptions): string | undefined {
     const arkuiXRawPath = (typeof process !== 'undefined') ? process.env.arkUIXSdkRootPath : undefined;
-    return arkuiXRawPath ? normalizePath(resolvePath(arkuiXRawPath, 'openharmony/ets')) : undefined;
-}
-
-/**
- * Returns the active SDK `openharmony/ets` path, preferring ArkUI-X SDK when configured.
- * @internal
- */
-export function getActiveSdkPath(compilerOptions: CompilerOptions): string | undefined {
-    const arkuiXSdkPath = getArkUIXSdkPath();
-    if (arkuiXSdkPath) {
-        return arkuiXSdkPath;
-    }
-    return compilerOptions.etsLoaderPath ? normalizePath(resolvePath(compilerOptions.etsLoaderPath, '../..')) : undefined;
-}
-
-/**
- * Returns the active SDK root path for `@throws` exemption checks, preferring ArkUI-X SDK when configured.
- * @internal
- */
-export function getSdkRootPathForThrows(compilerOptions: CompilerOptions): string | undefined {
-    const arkuiXSdkPath = getArkUIXSdkPath();
-    if (arkuiXSdkPath) {
-        return arkuiXSdkPath;
+    if (arkuiXRawPath) {
+        return normalizePath(arkuiXRawPath);
     }
     const sdkPath = getSdkPath(compilerOptions);
     return sdkPath ? normalizePath(sdkPath) : undefined;
-}
-
-/**
- * Returns the active SDK built-in UI component declarations directory, preferring ArkUI-X SDK when configured.
- * @internal
- */
-export function getSdkComponentDeclarationsPath(compilerOptions: CompilerOptions): string | undefined {
-    const arkuiXSdkPath = getArkUIXSdkPath();
-    if (arkuiXSdkPath) {
-        return normalizePath(resolvePath(arkuiXSdkPath, 'component'));
-    }
-    return compilerOptions.etsLoaderPath ? normalizePath(resolvePath(compilerOptions.etsLoaderPath, 'declarations')) : undefined;
 }
 
 function getKitJsonObject(name: string, sdkPath: string, compilerOptions: CompilerOptions): KitJsonInfo | undefined {

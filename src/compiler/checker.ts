@@ -918,6 +918,7 @@ import {
     resolutionExtensionIsTSOrJson,
     ResolvedModuleFull,
     ResolvedType,
+    resolvePath,
     resolveTripleslashReference,
     resolvingEmptyArray,
     RestTypeNode,
@@ -1079,10 +1080,8 @@ import {
     THROWS_CATCH,
     THROWS_ASYNC_CALLBACK,
     THROWS_ERROR_CALLBACK,
-    getActiveSdkPath,
+    getCurrentSdkPath,
     getLibraryCallFilterKind,
-    getSdkComponentDeclarationsPath,
-    getSdkRootPathForThrows,
     getStrictFilterMode,
     ohModulesPathPart
 } from "./ohApi";
@@ -1517,7 +1516,9 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
     var typeToStringCache = new WeakMap<Type, string>();
 
     // Get the SDK paths that need to skip the @throws check.
-    const skipSdkPath: string | undefined = getSdkRootPathForThrows(compilerOptions);
+    const sdkRootPath: string | undefined = getCurrentSdkPath(compilerOptions);
+    const skipSdkPath: string | undefined = sdkRootPath ? normalizePath(resolvePath(sdkRootPath, "openharmony/ets")) : undefined;
+    const skipHmsSdkPath: string | undefined = sdkRootPath ? normalizePath(resolvePath(sdkRootPath, "hms/ets")) : undefined;
 
     // Mark strictVariance flag
     var strictVarianceFlag: boolean = false;
@@ -4957,7 +4958,8 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
         }
 
         // the relative path of sdk
-        const sdkPath = getActiveSdkPath(compilerOptions);
+        const sdkRootPath = getCurrentSdkPath(compilerOptions);
+        const sdkPath = sdkRootPath ? normalizePath(resolvePath(sdkRootPath, "openharmony/ets")) : undefined;
         if (compilerOptions.needDoArkTsLinter &&
             currentSourceFile && currentSourceFile.scriptKind === ScriptKind.TS &&
             resolvedModule && (resolvedModule.extension === ".ets" || resolvedModule.extension === ".d.ets")) {
@@ -34404,7 +34406,10 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
             return false;
         }
 
-        const isSDKPath = !!(skipSdkPath && containsPath(skipSdkPath, sourceFileNamePath));
+        const isSDKPath = !!(
+            (skipSdkPath && containsPath(skipSdkPath, sourceFileNamePath)) ||
+            (skipHmsSdkPath && containsPath(skipHmsSdkPath, sourceFileNamePath))
+        );
         const tags = getJSDocTags(declaration);
         for (const tag of tags) {
             if (tag.tagName.escapedText === THROWS_TAG && !shouldSkipTag(tag, isSDKPath)) {
@@ -34596,10 +34601,11 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
         }
 
         // we believe node is an system ets component if it's declared in SDK component declarations directory
-        const declarationsPath = getSdkComponentDeclarationsPath(compilerOptions);
-        if (!declarationsPath) {
+        const sdkRootPath = getCurrentSdkPath(compilerOptions);
+        if (!sdkRootPath) {
             return false;
         }
+        const componentPath = normalizePath(resolvePath(sdkRootPath, "openharmony/ets/component"));
         const symbol = resolveSymbol(getSymbolAtLocation(node));
         const declarations = symbol?.declarations;
         // Check if it only has one declaration and was declared in sdk
@@ -34611,7 +34617,7 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
         if (!fileName) {
             return false;
         }
-        return containsPath(declarationsPath, normalizePath(fileName));
+        return containsPath(componentPath, normalizePath(fileName));
     }
 
     function propertyAccessExpressionConditionCheck(node: PropertyAccessExpression) {
