@@ -1382,6 +1382,32 @@ export function getSdkPath(compilerOptions: CompilerOptions): string | undefined
     return compilerOptions.etsLoaderPath ? resolvePath(compilerOptions.etsLoaderPath, '../../../..') : undefined;
 }
 
+/**
+ * Returns the active `ets` SDK directory for the current project (ArkUI-X `openharmony/ets` when `process.env.isCrossplatform === "true"`, otherwise `etsLoaderPath/../..`).
+ * @internal
+ */
+export function getCurrentSdkPath(compilerOptions: CompilerOptions): string | undefined {
+    const isCrossplatform = (typeof process !== 'undefined') && process.env.isCrossplatform === 'true';
+    if (isCrossplatform) {
+        const arkuiXRawPath = process.env.arkUIXSdkRootPath;
+        return arkuiXRawPath ? normalizePath(resolvePath(arkuiXRawPath, 'openharmony/ets')) : undefined;
+    }
+    return compilerOptions.etsLoaderPath ? normalizePath(resolvePath(compilerOptions.etsLoaderPath, '../..')) : undefined;
+}
+
+/**
+ * Returns the SDK root directory for `@throws` exemption checks (ArkUI-X `openharmony/ets` when `process.env.isCrossplatform === "true"`, otherwise `getSdkPath`).
+ * @internal
+ */
+export function getCurrentThrowsSdkPath(compilerOptions: CompilerOptions): string | undefined {
+    const isCrossplatform = (typeof process !== 'undefined') && process.env.isCrossplatform === 'true';
+    if (isCrossplatform) {
+        return getCurrentSdkPath(compilerOptions);
+    }
+    const sdkPath = getSdkPath(compilerOptions);
+    return sdkPath ? normalizePath(sdkPath) : undefined;
+}
+
 function getKitJsonObject(name: string, sdkPath: string, compilerOptions: CompilerOptions): KitJsonInfo | undefined {
     if (kitJsonCache?.has(name)) {
         return kitJsonCache.get(name);

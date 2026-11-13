@@ -14,8 +14,8 @@
  */
 
 import {
-  ArkTSLinterTimePrinter, arrayFrom, BuilderProgram, BuilderProgramState, Diagnostic, DiagnosticCategory, getBaseFileName, getStrictFilterMode,
-  isOHModules, Map, normalizePath, Path, PerformanceDotting, Program, resolvePath, ReusableBuilderProgramState, ScriptKind, Set, SourceFile,
+  ArkTSLinterTimePrinter, arrayFrom, BuilderProgram, BuilderProgramState, containsPath, Diagnostic, DiagnosticCategory, getBaseFileName, getCurrentSdkPath, getStrictFilterMode,
+  isOHModules, Map, normalizePath, Path, PerformanceDotting, Program, ReusableBuilderProgramState, ScriptKind, Set, SourceFile,
   TimePhase, WriteFileCallback, MemoryUtils
 } from "../_namespaces/ts";
 import { 
@@ -154,8 +154,9 @@ buildInfoWriteFile?: WriteFileCallback, arkTSVersion?: string): Diagnostic[] {
       } else {
         InteropTypescriptLinter.initStatic();
         const isKit = getBaseFileName(fileToLint.fileName).indexOf('@kit.') === 0;
-        const etsLoaderPath = program.getCompilerOptions().etsLoaderPath;
-        const isInSdk = etsLoaderPath ? normalizePath(fileToLint.fileName).indexOf(resolvePath(etsLoaderPath, '../..')) === 0 : false;
+        const normalizedFileName = normalizePath(fileToLint.fileName);
+        const sdkPath = getCurrentSdkPath(program.getCompilerOptions());
+        const isInSdk = !!(sdkPath && containsPath(sdkPath, normalizedFileName));
         const isInOhModules = isOHModules(fileToLint.fileName);
         const tsImportSendableEnable = program.getCompilerOptions().tsImportSendableEnable;
         if (isKit || isInOhModules || (!tsImportSendableEnable && !isInSdk)) {

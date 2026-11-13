@@ -90,6 +90,7 @@ import {
     ConstructorTypeNode,
     ConstructSignatureDeclaration,
     contains,
+    containsPath,
     containsParseError,
     ContextFlags,
     copyEntries,
@@ -1079,8 +1080,9 @@ import {
     THROWS_CATCH,
     THROWS_ASYNC_CALLBACK,
     THROWS_ERROR_CALLBACK,
+    getCurrentSdkPath,
+    getCurrentThrowsSdkPath,
     getLibraryCallFilterKind,
-    getSdkPath,
     getStrictFilterMode,
     ohModulesPathPart
 } from "./ohApi";
@@ -1515,8 +1517,7 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
     var typeToStringCache = new WeakMap<Type, string>();
 
     // Get the SDK paths that need to skip the @throws check.
-    const skipSdkPath: string = getSdkPath(compilerOptions)!;
-    const skipSdkPathReg: RegExp = new RegExp(skipSdkPath);
+    const skipSdkPath: string | undefined = getCurrentThrowsSdkPath(compilerOptions);
 
     // Mark strictVariance flag
     var strictVarianceFlag: boolean = false;
@@ -4956,7 +4957,7 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
         }
 
         // the relative path of sdk
-        const sdkPath = compilerOptions.etsLoaderPath ? resolvePath(compilerOptions.etsLoaderPath, '../..') : undefined;
+        const sdkPath = getCurrentSdkPath(compilerOptions);
         if (compilerOptions.needDoArkTsLinter &&
             currentSourceFile && currentSourceFile.scriptKind === ScriptKind.TS &&
             resolvedModule && (resolvedModule.extension === ".ets" || resolvedModule.extension === ".d.ets")) {
@@ -5144,7 +5145,8 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
     }
 
     function allowImportSendable(sdkPath: string | undefined, currentSourceFile: SourceFile): boolean {
-        const isInSdkPath = !!(sdkPath && ts.normalizePath(currentSourceFile.fileName).startsWith(sdkPath));
+        const normalizedFileName = normalizePath(currentSourceFile.fileName);
+        const isInSdkPath = !!(sdkPath && containsPath(sdkPath, normalizedFileName));
         // Check the file is a TypeScript file outside of the method
         // currentSourceFile must be a ts file
         return (
@@ -34396,13 +34398,13 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
     // Determine whether to validate @throws annotations on function declarations, skipping checks for:
     // Paths containing '/node_modules/', '/oh_modules/', or '/js_util_module/' and only @throws tags marked with '401' in SDK paths.
     function shouldCheckThrows(declaration: SignatureDeclaration): boolean {
-        const sourceFileNamePath = getSourceFileOfNode(declaration).fileName.replace(/\\/g, '/');
+        const sourceFileNamePath = normalizePath(getSourceFileOfNode(declaration).fileName);
         const SKIPPED_PATHS = ['/node_modules/', '/oh_modules/', '/js_util_module/'];
         if (SKIPPED_PATHS.some(path => sourceFileNamePath.includes(path))) {
             return false;
         }
 
-        const isSDKPath = skipSdkPathReg.test(sourceFileNamePath);
+        const isSDKPath = !!(skipSdkPath && containsPath(skipSdkPath, sourceFileNamePath));
         const tags = getJSDocTags(declaration);
         for (const tag of tags) {
             if (tag.tagName.escapedText === THROWS_TAG && !shouldSkipTag(tag, isSDKPath)) {
@@ -34593,11 +34595,12 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
             return false;
         }
 
-        // we believe node is an system ets component if it's declared in "ets-loader/declarations/" in sdk
-        if (!compilerOptions.etsLoaderPath) {
+        // we believe node is an system ets component if it's declared in SDK component declarations directory
+        const etsSdkPath = getCurrentSdkPath(compilerOptions);
+        if (!etsSdkPath) {
             return false;
         }
-        const declarationsPath = resolvePath(compilerOptions.etsLoaderPath, "declarations");
+        const componentPath = normalizePath(resolvePath(etsSdkPath, "component"));
         const symbol = resolveSymbol(getSymbolAtLocation(node));
         const declarations = symbol?.declarations;
         // Check if it only has one declaration and was declared in sdk
@@ -34606,7 +34609,10 @@ export function createTypeChecker(host: TypeCheckerHost, isTypeCheckerForLinter:
         }
         const sourceFile = getSourceFileOfNode(declarations[0]);
         const fileName = sourceFile?.fileName;
-        return !!fileName?.startsWith(declarationsPath);
+        if (!fileName) {
+            return false;
+        }
+        return containsPath(componentPath, normalizePath(fileName));
     }
 
     function propertyAccessExpressionConditionCheck(node: PropertyAccessExpression) {

@@ -14,11 +14,11 @@
  */
 import * as ts from "../_namespaces/ts";
 import {
-    ArrayLiteralExpression, AsExpression, ClassDeclaration, CommentRange, ExportAssignment, ExportDeclaration,
-    forEachChild, getBaseFileName, getModeForUsageLocation, getResolvedModule, getSourceFileOfNode, HeritageClause,
+    ArrayLiteralExpression, AsExpression, ClassDeclaration, CommentRange, containsPath, ExportAssignment, ExportDeclaration,
+    forEachChild, getBaseFileName, getCurrentSdkPath, getModeForUsageLocation, getResolvedModule, getSourceFileOfNode, HeritageClause,
     Identifier, ImportClause, ImportDeclaration, InterfaceDeclaration, isModuleDeclaration, isNamedExports,
     isNamedImports, isNamespaceImport, isStringLiteralLike, Map, NamedExports, NamedImports, NewExpression, Node,
-    normalizePath, ObjectLiteralExpression, Program, ResolvedModuleFull, resolvePath, SourceFile, SyntaxKind,
+    normalizePath, ObjectLiteralExpression, Program, ResolvedModuleFull, SourceFile, SyntaxKind,
     TypeChecker, perfLogger as Logger
 } from "../_namespaces/ts";
 import { 
@@ -93,7 +93,7 @@ export class InteropTypescriptLinter {
     InteropTypescriptLinter.etsLoaderPath = tsProgram.getCompilerOptions().etsLoaderPath;
     this.currentErrorLine = 0;
     this.currentWarningLine = 0;
-    this.SDK_PATH = InteropTypescriptLinter.etsLoaderPath ? resolvePath(InteropTypescriptLinter.etsLoaderPath, '../../') : undefined;
+    this.SDK_PATH = getCurrentSdkPath(tsProgram.getCompilerOptions());
   }
 
   public static clearTsTypeChecker(): void {
@@ -308,9 +308,8 @@ export class InteropTypescriptLinter {
   }
 
   private allowInSdkImportSendable(resolvedModule: ResolvedModuleFull): boolean {
-    const resolvedModuleIsInSdk = this.SDK_PATH ?
-      normalizePath(resolvedModule.resolvedFileName).startsWith(this.SDK_PATH) :
-      false;
+    const normalizedResolvedFileName = normalizePath(resolvedModule.resolvedFileName);
+    const resolvedModuleIsInSdk = !!(this.SDK_PATH && containsPath(this.SDK_PATH, normalizedResolvedFileName));
     return this.isInSdk && resolvedModuleIsInSdk && getBaseFileName(resolvedModule.resolvedFileName).indexOf('sendable') !== -1;
   }
 

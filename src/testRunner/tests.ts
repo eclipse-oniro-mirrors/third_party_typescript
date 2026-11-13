@@ -5,6 +5,7 @@ import "./unittests/comments";
 import "./unittests/compilerCore";
 import "./unittests/constEnumRelateReset";
 import './unittests/strictFilterMode';
+import "./unittests/arkuiXSdkPath";
 import "./unittests/convertToBase64";
 import "./unittests/customTransforms";
 import "./unittests/factory";
