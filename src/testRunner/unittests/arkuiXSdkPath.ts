@@ -24,6 +24,7 @@ describe("unittests:: ArkUI-X independent SDK path resolution", () => {
     const hostSdkPath = "/host/openharmony/ets/build-tools/ets-loader";
     const defaultArkuiXRoot = "/custom/arkui-x/Sdk";
     let originalArkuiXPath: string | undefined;
+    let originalIsCrossplatform: string | undefined;
 
     function createVirtualHost(
         files: Readonly<Record<string, VirtualFileEntry>>,
@@ -192,8 +193,10 @@ function callApi(): void {
 
     beforeEach(() => {
         originalArkuiXPath = process.env.arkUIXSdkRootPath;
+        originalIsCrossplatform = process.env.isCrossplatform;
         delete process.env.arkUIXSdkRootPath;
         delete process.env.arkUIXSdxRootPath;
+        delete process.env.isCrossplatform;
     });
 
     afterEach(() => {
@@ -203,11 +206,22 @@ function callApi(): void {
         else {
             delete process.env.arkUIXSdkRootPath;
         }
+        if (originalIsCrossplatform !== undefined) {
+            process.env.isCrossplatform = originalIsCrossplatform;
+        }
+        else {
+            delete process.env.isCrossplatform;
+        }
         delete process.env.arkUIXSdxRootPath;
     });
 
+    function enableCrossplatformArkuiXSdk(rootPath: string = defaultArkuiXRoot): void {
+        process.env.isCrossplatform = "true";
+        process.env.arkUIXSdkRootPath = rootPath;
+    }
+
     it("recognizes system components declared under ArkUI-X SDK openharmony/ets/component/ path", () => {
-        process.env.arkUIXSdkRootPath = defaultArkuiXRoot;
+        enableCrossplatformArkuiXSdk();
 
         const diags = runComponentCheck(`${defaultArkuiXRoot}/openharmony/ets/component/button.d.ts`, "Button");
         // System UI component called outside build context in ETS file should report error 28015
@@ -216,7 +230,7 @@ function callApi(): void {
     });
 
     it("does not misidentify custom component in component-custom directory as system component (boundary check)", () => {
-        process.env.arkUIXSdkRootPath = defaultArkuiXRoot;
+        enableCrossplatformArkuiXSdk();
 
         // Adjacent path sharing 'component' prefix but not in 'component' directory
         const diags = runComponentCheck(`${defaultArkuiXRoot}/openharmony/ets/component-custom/button.d.ts`, "CustomButton");
@@ -226,6 +240,7 @@ function callApi(): void {
     });
 
     it("does not recognize system components when only typo env var arkUIXSdxRootPath is set", () => {
+        process.env.isCrossplatform = "true";
         delete process.env.arkUIXSdkRootPath;
         process.env.arkUIXSdxRootPath = defaultArkuiXRoot;
 
@@ -235,7 +250,7 @@ function callApi(): void {
     });
 
     it("allows declaration files in ArkUI-X SDK to import sendable declarations without forbidden error", () => {
-        process.env.arkUIXSdkRootPath = defaultArkuiXRoot;
+        enableCrossplatformArkuiXSdk();
 
         const diags = runSendableImportCheck(
             `${defaultArkuiXRoot}/openharmony/ets/api/@ohos.test.d.ts`,
@@ -246,7 +261,7 @@ function callApi(): void {
     });
 
     it("strictly checks directory boundaries and forbids sendable import from adjacent ets-user directory", () => {
-        process.env.arkUIXSdkRootPath = defaultArkuiXRoot;
+        enableCrossplatformArkuiXSdk();
 
         // Adjacent directory with same prefix: openharmony/ets-user/ vs openharmony/ets/
         const diags = runSendableImportCheck(
@@ -259,7 +274,7 @@ function callApi(): void {
     });
 
     it("skips @throws 401 warning for functions declared under ArkUI-X SDK", () => {
-        process.env.arkUIXSdkRootPath = defaultArkuiXRoot;
+        enableCrossplatformArkuiXSdk();
 
         const diags = runThrowsCheck(
             `${defaultArkuiXRoot}/openharmony/ets/api/@ohos.throws401.d.ts`,
@@ -270,7 +285,7 @@ function callApi(): void {
     });
 
     it("reports @throws 401 warning for functions in adjacent non-SDK ets-user directory", () => {
-        process.env.arkUIXSdkRootPath = defaultArkuiXRoot;
+        enableCrossplatformArkuiXSdk();
 
         const diags = runThrowsCheck(
             `${defaultArkuiXRoot}/openharmony/ets-user/@ohos.throws401.d.ts`,
@@ -281,7 +296,7 @@ function callApi(): void {
     });
 
     it("still reports non-401 @throws warning for functions declared under ArkUI-X SDK", () => {
-        process.env.arkUIXSdkRootPath = defaultArkuiXRoot;
+        enableCrossplatformArkuiXSdk();
 
         const diags = runThrowsCheck(
             `${defaultArkuiXRoot}/openharmony/ets/api/@ohos.throws201.d.ts`,
@@ -292,7 +307,7 @@ function callApi(): void {
     });
 
     it("Linter classifies ArkUI-X SDK file as SDK and allows importing SDK sendable declaration", () => {
-        process.env.arkUIXSdkRootPath = defaultArkuiXRoot;
+        enableCrossplatformArkuiXSdk();
 
         const diags = runInteropLinterCheck(
             `${defaultArkuiXRoot}/openharmony/ets/api/@ohos.caller.d.ts`,
@@ -304,7 +319,7 @@ function callApi(): void {
     });
 
     it("Linter does not classify adjacent ets-user file as SDK when importing SDK sendable declaration", () => {
-        process.env.arkUIXSdkRootPath = defaultArkuiXRoot;
+        enableCrossplatformArkuiXSdk();
 
         const diags = runInteropLinterCheck(
             `${defaultArkuiXRoot}/openharmony/ets-user/caller.d.ts`,
@@ -316,7 +331,7 @@ function callApi(): void {
     });
 
     it("Linter rejects target sendable module in adjacent ets-user directory even when caller is in ArkUI-X SDK", () => {
-        process.env.arkUIXSdkRootPath = defaultArkuiXRoot;
+        enableCrossplatformArkuiXSdk();
 
         const diags = runInteropLinterCheck(
             `${defaultArkuiXRoot}/openharmony/ets/api/@ohos.caller.d.ts`,
@@ -328,7 +343,7 @@ function callApi(): void {
     });
 
     it("does not exempt host OpenHarmony SDK files when ArkUI-X SDK path is active", () => {
-        process.env.arkUIXSdkRootPath = defaultArkuiXRoot;
+        enableCrossplatformArkuiXSdk();
 
         const throwsDiags = runThrowsCheck(
             "/host/openharmony/ets/api/@ohos.throws401.d.ts",
@@ -343,5 +358,22 @@ function callApi(): void {
         );
         const forbiddenDiag = findForbiddenSendableDiagnostic(sendableDiags);
         assert.isDefined(forbiddenDiag, "Expected host SDK .d.ts not to be exempted for sendable import when ArkUI-X SDK is active");
+    });
+
+    it("uses host OpenHarmony SDK instead of ArkUI-X SDK when isCrossplatform is not true even if arkUIXSdkRootPath is set", () => {
+        process.env.isCrossplatform = "false";
+        process.env.arkUIXSdkRootPath = defaultArkuiXRoot;
+
+        const arkuiXThrowsDiags = runThrowsCheck(
+            `${defaultArkuiXRoot}/openharmony/ets/api/@ohos.throws401.d.ts`,
+            "{ BusinessError } 401 - Parameter error."
+        );
+        assert.isDefined(findThrowsDiagnostic(arkuiXThrowsDiags), "Expected ArkUI-X SDK path not to be exempted when isCrossplatform is false");
+
+        const hostThrowsDiags = runThrowsCheck(
+            "/host/openharmony/ets/api/@ohos.throws401.d.ts",
+            "{ BusinessError } 401 - Parameter error."
+        );
+        assert.isUndefined(findThrowsDiagnostic(hostThrowsDiags), "Expected host OpenHarmony SDK path to be exempted when isCrossplatform is false");
     });
 });

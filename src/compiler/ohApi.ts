@@ -1383,13 +1383,14 @@ export function getSdkPath(compilerOptions: CompilerOptions): string | undefined
 }
 
 /**
- * Returns the SDK root directory for the current project (ArkUI-X SDK or OpenHarmony SDK).
+ * Returns the SDK root directory for the current project (ArkUI-X SDK when `process.env.isCrossplatform === "true"`, otherwise OpenHarmony SDK).
  * @internal
  */
 export function getCurrentSdkPath(compilerOptions: CompilerOptions): string | undefined {
-    const arkuiXRawPath = (typeof process !== 'undefined') ? process.env.arkUIXSdkRootPath : undefined;
-    if (arkuiXRawPath) {
-        return normalizePath(arkuiXRawPath);
+    const isCrossplatform = (typeof process !== 'undefined') && process.env.isCrossplatform === 'true';
+    if (isCrossplatform) {
+        const arkuiXRawPath = process.env.arkUIXSdkRootPath;
+        return arkuiXRawPath ? normalizePath(arkuiXRawPath) : undefined;
     }
     const sdkPath = getSdkPath(compilerOptions);
     return sdkPath ? normalizePath(sdkPath) : undefined;
