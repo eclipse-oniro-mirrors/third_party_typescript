@@ -96,98 +96,102 @@ buildInfoWriteFile?: WriteFileCallback, arkTSVersion?: string): Diagnostic[] {
     programState.buildInfoEmitPending = true;
   }
 
-  let srcFiles: SourceFile[] = [];
-  if (!!srcFile) {
-    srcFiles.push(srcFile);
-  } else {
-    srcFiles = program.getSourceFiles() as SourceFile[];
-  }
-
-  PerformanceDotting.startAdvanced(TimePhase.GET_TSC_DIAGNOSTICS);
-  const tscStrictDiagnostics = getTscDiagnostics(tscDiagnosticsLinter, srcFiles.filter(file => changedFiles.has(file.resolvedPath)));
-  timePrinterInstance.appendTime(TimePhase.GET_TSC_DIAGNOSTICS);
-  PerformanceDotting.stopAdvanced(TimePhase.GET_TSC_DIAGNOSTICS);
-
-  const lintRecordLog: string = TimePhase.LINT + '(checkedFilesNum: ' + changedFiles.size + ', totalFilesNum: ' + srcFiles.length + ')';
-  PerformanceDotting.startAdvanced(lintRecordLog);
-  TypeScriptLinter.initGlobals(compilerOptions);
-  InteropTypescriptLinter.initGlobals();
-  LibraryTypeCallDiagnosticChecker.instance.rebuildTscDiagnostics(tscStrictDiagnostics, compilerOptions);
-
-  var lintLoop = function(fileToLint: SourceFile) {
-    if (fileToLint.scriptKind !== ScriptKind.ETS && fileToLint.scriptKind !== ScriptKind.TS) {
-      return "continue";
+  // Run ArkTS linter check unless skipArkTSLinter is enabled.
+  // TSC syntax parsing has already been done by doAllGetDiagnostics.
+  if (!compilerOptions.skipArkTSLinter) {
+    let srcFiles: SourceFile[] = [];
+    if (!!srcFile) {
+      srcFiles.push(srcFile);
+    } else {
+      srcFiles = program.getSourceFiles() as SourceFile[];
     }
 
-    let currentDiagnostics: Diagnostic[];
-    if (changedFiles.has(fileToLint.resolvedPath)) {
-      const skipOhModulesLint = compilerOptions.skipOhModulesLint && isOHModules(fileToLint.fileName);
-      if (skipOhModulesLint) {
+    PerformanceDotting.startAdvanced(TimePhase.GET_TSC_DIAGNOSTICS);
+    const tscStrictDiagnostics = getTscDiagnostics(tscDiagnosticsLinter, srcFiles.filter(file => changedFiles.has(file.resolvedPath)));
+    timePrinterInstance.appendTime(TimePhase.GET_TSC_DIAGNOSTICS);
+    PerformanceDotting.stopAdvanced(TimePhase.GET_TSC_DIAGNOSTICS);
+
+    const lintRecordLog: string = TimePhase.LINT + '(checkedFilesNum: ' + changedFiles.size + ', totalFilesNum: ' + srcFiles.length + ')';
+    PerformanceDotting.startAdvanced(lintRecordLog);
+    TypeScriptLinter.initGlobals(compilerOptions);
+    InteropTypescriptLinter.initGlobals();
+    LibraryTypeCallDiagnosticChecker.instance.rebuildTscDiagnostics(tscStrictDiagnostics, compilerOptions);
+
+    var lintLoop = function(fileToLint: SourceFile) {
+      if (fileToLint.scriptKind !== ScriptKind.ETS && fileToLint.scriptKind !== ScriptKind.TS) {
         return "continue";
       }
-    
-      if (fileToLint.scriptKind === ScriptKind.ETS) {
-        TypeScriptLinter.initStatic();
-        const linter = new TypeScriptLinter(
-          fileToLint,
-          program,
-          !enableStrictCheckOHModule,
-          tscStrictDiagnostics
-        );
-        setTypeChecker(TypeScriptLinter.tsTypeChecker);
-        setMixCompile(!!compilerOptions.mixCompile);
-        linter.lint();
 
-        // Get list of bad nodes from the current run.
-        // When strictCheckerOnly is enabled, we need to merge linter-processed diagnostics with non-linter diagnostics
-        const fileName = normalizePath(fileToLint.fileName);
-        const linterProcessedDiagnostics = tscStrictDiagnostics.get(fileName) ?? [];
-        if (compilerOptions.strictCheckerOnly) {
-          currentDiagnostics = LibraryTypeCallDiagnosticChecker.instance.mergeDiagnostics(
-            fileName,
-            linterProcessedDiagnostics
-          );
-        } else {
-          currentDiagnostics = linterProcessedDiagnostics;
-        }
-        TypeScriptLinter.problemsInfos.forEach((x) => currentDiagnostics.push(translateDiag(fileToLint, x)));
-      } else {
-        InteropTypescriptLinter.initStatic();
-        const isKit = getBaseFileName(fileToLint.fileName).indexOf('@kit.') === 0;
-        const normalizedFileName = normalizePath(fileToLint.fileName);
-        const sdkPath = getCurrentSdkPath(program.getCompilerOptions());
-        const isInSdk = !!(sdkPath && containsPath(sdkPath, normalizedFileName));
-        const isInOhModules = isOHModules(fileToLint.fileName);
-        const tsImportSendableEnable = program.getCompilerOptions().tsImportSendableEnable;
-        if (isKit || isInOhModules || (!tsImportSendableEnable && !isInSdk)) {
+      let currentDiagnostics: Diagnostic[];
+      if (changedFiles.has(fileToLint.resolvedPath)) {
+        const skipOhModulesLint = compilerOptions.skipOhModulesLint && isOHModules(fileToLint.fileName);
+        if (skipOhModulesLint) {
           return "continue";
         }
-        const InteropLinter = new InteropTypescriptLinter(fileToLint, program, isInSdk);
-        setTypeChecker(InteropTypescriptLinter.tsTypeChecker);
-        setMixCompile(!!compilerOptions.mixCompile);
-        InteropLinter.lint();
+      
+        if (fileToLint.scriptKind === ScriptKind.ETS) {
+          TypeScriptLinter.initStatic();
+          const linter = new TypeScriptLinter(
+            fileToLint,
+            program,
+            !enableStrictCheckOHModule,
+            tscStrictDiagnostics
+          );
+          setTypeChecker(TypeScriptLinter.tsTypeChecker);
+          setMixCompile(!!compilerOptions.mixCompile);
+          linter.lint();
 
-        currentDiagnostics = [];
-        InteropTypescriptLinter.problemsInfos.forEach((x) => currentDiagnostics.push(translateDiag(fileToLint, x)));
+          // Get list of bad nodes from the current run.
+          // When strictCheckerOnly is enabled, we need to merge linter-processed diagnostics with non-linter diagnostics
+          const fileName = normalizePath(fileToLint.fileName);
+          const linterProcessedDiagnostics = tscStrictDiagnostics.get(fileName) ?? [];
+          if (compilerOptions.strictCheckerOnly) {
+            currentDiagnostics = LibraryTypeCallDiagnosticChecker.instance.mergeDiagnostics(
+              fileName,
+              linterProcessedDiagnostics
+            );
+          } else {
+            currentDiagnostics = linterProcessedDiagnostics;
+          }
+          TypeScriptLinter.problemsInfos.forEach((x) => currentDiagnostics.push(translateDiag(fileToLint, x)));
+        } else {
+          InteropTypescriptLinter.initStatic();
+          const isKit = getBaseFileName(fileToLint.fileName).indexOf('@kit.') === 0;
+          const normalizedFileName = normalizePath(fileToLint.fileName);
+          const sdkPath = getCurrentSdkPath(program.getCompilerOptions());
+          const isInSdk = !!(sdkPath && containsPath(sdkPath, normalizedFileName));
+          const isInOhModules = isOHModules(fileToLint.fileName);
+          const tsImportSendableEnable = program.getCompilerOptions().tsImportSendableEnable;
+          if (isKit || isInOhModules || (!tsImportSendableEnable && !isInSdk)) {
+            return "continue";
+          }
+          const InteropLinter = new InteropTypescriptLinter(fileToLint, program, isInSdk);
+          setTypeChecker(InteropTypescriptLinter.tsTypeChecker);
+          setMixCompile(!!compilerOptions.mixCompile);
+          InteropLinter.lint();
+
+          currentDiagnostics = [];
+          InteropTypescriptLinter.problemsInfos.forEach((x) => currentDiagnostics.push(translateDiag(fileToLint, x)));
+        }
+      } else {
+        // Get diagnostics from old run.
+        currentDiagnostics = (oldDiagnostics?.get(fileToLint.resolvedPath) as Diagnostic[]) ?? [];
       }
-    } else {
-      // Get diagnostics from old run.
-      currentDiagnostics = (oldDiagnostics?.get(fileToLint.resolvedPath) as Diagnostic[]) ?? [];
+      diagnostics.push(...currentDiagnostics);
+
+      // Add linter diagnostics to new cache.
+      programState.arktsLinterDiagnosticsPerFile?.set(fileToLint.resolvedPath, currentDiagnostics);
+    };
+
+    MemoryUtils.initializeBaseMemory();
+    for (const fileToLint of srcFiles) {
+      lintLoop(fileToLint);
+      MemoryUtils.tryGC();
     }
-    diagnostics.push(...currentDiagnostics);
 
-    // Add linter diagnostics to new cache.
-    programState.arktsLinterDiagnosticsPerFile?.set(fileToLint.resolvedPath, currentDiagnostics);
-  };
-
-  MemoryUtils.initializeBaseMemory();
-  for (const fileToLint of srcFiles) {
-    lintLoop(fileToLint);
-    MemoryUtils.tryGC();
+    timePrinterInstance.appendTime(TimePhase.LINT);
+    PerformanceDotting.stopAdvanced(lintRecordLog);
   }
-
-  timePrinterInstance.appendTime(TimePhase.LINT);
-  PerformanceDotting.stopAdvanced(lintRecordLog);
 
   // Write tsbuildinfo file only after we cached the linter diagnostics.
   PerformanceDotting.startAdvanced(TimePhase.EMIT_BUILD_INFO);

@@ -52,50 +52,55 @@ buildInfoWriteFile?: WriteFileCallback, arkTSVersion?: string): Diagnostic[] {
 
   const tscDiagnosticsLinter = new TSCCompiledProgram(tsBuilderProgram);
   const program = tscDiagnosticsLinter.getProgram();
+  const compilerOptions = program.getCompilerOptions();
 
   const timePrinterInstance = ArkTSLinterTimePrinter.getInstance();
   timePrinterInstance.appendTime(TimePhase.INIT);
 
   tscDiagnosticsLinter.doAllGetDiagnostics();
 
-  let srcFiles: SourceFile[] = [];
-  if (!!srcFile) {
-    srcFiles.push(srcFile);
-  } else {
-    srcFiles = program.getSourceFiles() as SourceFile[];
-  }
-
-  const tscStrictDiagnostics = getTscDiagnostics(tscDiagnosticsLinter, srcFiles.filter(file => changedFiles.has(file.resolvedPath)));
-  timePrinterInstance.appendTime(TimePhase.GET_TSC_DIAGNOSTICS);
-
-  TypeScriptLinter.initGlobals();
-
-  for (const fileToLint of srcFiles) {
-    TypeScriptLinter.initStatic();
-    if (TypeScriptLinter.lintEtsOnly && fileToLint.scriptKind !== ScriptKind.ETS) {
-      continue;
-    }
-
-    let currentDiagnostics: Diagnostic[];
-    if (changedFiles.has(fileToLint.resolvedPath)) {
-      const linter = new TypeScriptLinter(fileToLint, program, tscStrictDiagnostics);
-      setTypeChecker(TypeScriptLinter.tsTypeChecker);
-      linter.lint();
-
-      // Get list of bad nodes from the current run.
-      currentDiagnostics = tscStrictDiagnostics.get(normalizePath(fileToLint.fileName)) ?? [];
-      TypeScriptLinter.problemsInfos.forEach((x) => currentDiagnostics.push(translateDiag(fileToLint, x)));
+  // Run ArkTS linter check unless skipArkTSLinter is enabled.
+  // TSC syntax parsing has already been done by doAllGetDiagnostics.
+  if (!compilerOptions.skipArkTSLinter) {
+    let srcFiles: SourceFile[] = [];
+    if (!!srcFile) {
+      srcFiles.push(srcFile);
     } else {
-      // Get diagnostics from old run.
-      currentDiagnostics = (oldDiagnostics?.get(fileToLint.resolvedPath) as Diagnostic[]) ?? [];
+      srcFiles = program.getSourceFiles() as SourceFile[];
     }
-    diagnostics.push(...currentDiagnostics);
 
-    // Add linter diagnostics to new cache.
-    programState.arktsLinterDiagnosticsPerFile.set(fileToLint.resolvedPath, currentDiagnostics);
+    const tscStrictDiagnostics = getTscDiagnostics(tscDiagnosticsLinter, srcFiles.filter(file => changedFiles.has(file.resolvedPath)));
+    timePrinterInstance.appendTime(TimePhase.GET_TSC_DIAGNOSTICS);
+
+    TypeScriptLinter.initGlobals();
+
+    for (const fileToLint of srcFiles) {
+      TypeScriptLinter.initStatic();
+      if (TypeScriptLinter.lintEtsOnly && fileToLint.scriptKind !== ScriptKind.ETS) {
+        continue;
+      }
+
+      let currentDiagnostics: Diagnostic[];
+      if (changedFiles.has(fileToLint.resolvedPath)) {
+        const linter = new TypeScriptLinter(fileToLint, program, tscStrictDiagnostics);
+        setTypeChecker(TypeScriptLinter.tsTypeChecker);
+        linter.lint();
+
+        // Get list of bad nodes from the current run.
+        currentDiagnostics = tscStrictDiagnostics.get(normalizePath(fileToLint.fileName)) ?? [];
+        TypeScriptLinter.problemsInfos.forEach((x) => currentDiagnostics.push(translateDiag(fileToLint, x)));
+      } else {
+        // Get diagnostics from old run.
+        currentDiagnostics = (oldDiagnostics?.get(fileToLint.resolvedPath) as Diagnostic[]) ?? [];
+      }
+      diagnostics.push(...currentDiagnostics);
+
+      // Add linter diagnostics to new cache.
+      programState.arktsLinterDiagnosticsPerFile.set(fileToLint.resolvedPath, currentDiagnostics);
+    }
+
+    timePrinterInstance.appendTime(TimePhase.LINT);
   }
-
-  timePrinterInstance.appendTime(TimePhase.LINT);
 
   // Write tsbuildinfo file only after we cached the linter diagnostics.
   if (!!buildInfoWriteFile) {

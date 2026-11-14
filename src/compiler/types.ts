@@ -6992,6 +6992,7 @@ export interface CompilerOptions {
     skipOhModulesLint?: boolean;
     enableStrictCheckOHModule?: boolean;
     disableStrictCheckPaths?: string[];
+    skipArkTSLinter?: boolean; // Skip ArkTS linter check when enabled (effective only in debug mode).
     mixCompile?: boolean;
     isCompileJsHar?: boolean; // The har where the compilation output is a js file.
     moduleRootPath?: string; // The root path of module, such as har.
