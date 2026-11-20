@@ -3406,6 +3406,7 @@ declare namespace ts {
         skipOhModulesLint?: boolean;
         enableStrictCheckOHModule?: boolean;
         disableStrictCheckPaths?: string[];
+        skipArkTSLinter?: boolean;
         mixCompile?: boolean;
         isCompileJsHar?: boolean;
         moduleRootPath?: string;
