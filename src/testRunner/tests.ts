@@ -13,6 +13,7 @@ import "./unittests/incrementalParser";
 import "./unittests/jsDocParsing";
 import "./unittests/jsonParserRecovery";
 import "./unittests/moduleResolution";
+import './unittests/patternMemoization';
 import "./unittests/parsePseudoBigInt";
 import "./unittests/paths";
 import "./unittests/printer";
